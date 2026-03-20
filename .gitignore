@@ -1,0 +1,7 @@
+venv
+*.pyc
+__pycache__/*
+*.pth
+*.pt
+hypersim_test_set
+checkpoints

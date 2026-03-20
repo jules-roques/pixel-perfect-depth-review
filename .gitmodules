@@ -1,0 +1,3 @@
+[submodule "external/pixel-perfect-depth"]
+	path = external/pixel-perfect-depth
+	url = git@github.com:gangweix/pixel-perfect-depth.git
