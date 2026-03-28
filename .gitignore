@@ -1,7 +1,17 @@
 venv
+.venv
 *.pyc
 __pycache__/*
 *.pth
 *.pt
 hypersim_test_set
 checkpoints
+.env
+*.egg-info/
+build/
+dist/
+*.egg
+sandbox/
+output/
+results/
+.vscode

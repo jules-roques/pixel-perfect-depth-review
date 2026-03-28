@@ -23,10 +23,11 @@
 # SOFTWARE.
 #
 
-import os
 import argparse
-import requests
+import os
 import zipfile
+
+import requests
 
 # Increase download speed
 zipfile.ZipExtFile.MIN_READ_SIZE = 2**20
@@ -492,95 +493,6 @@ URLS = [
 ]
 
 
-class WebFile:
-    def __init__(self, url, session):
-        with session.head(url) as response:
-            size = int(response.headers["content-length"])
-
-        self.url = url
-        self.session = session
-        self.offset = 0
-        self.size = size
-
-    def seekable(self):
-        return True
-
-    def tell(self):
-        return self.offset
-
-    def available(self):
-        return self.size - self.offset
-
-    def seek(self, offset, whence=0):
-        if whence == 0:
-            self.offset = offset
-        elif whence == 1:
-            self.offset = min(self.offset + offset, self.size)
-        elif whence == 2:
-            self.offset = max(0, self.size + offset)
-        return self.offset
-
-    def read(self, n=None):
-        if n is None:
-            n = self.available()
-        else:
-            n = min(n, self.available())
-
-        end_inclusive = self.offset + n - 1
-
-        headers = {
-            "Range": f"bytes={self.offset}-{end_inclusive}",
-        }
-
-        with self.session.get(self.url, headers=headers) as response:
-            data = response.content
-
-        self.offset += len(data)
-
-        return data
-
-
-def download_files(args):
-    session = requests.session()
-
-    # For each zip file
-    for url in URLS:
-
-        if args.scene is None or args.scene in url:
-
-            f = WebFile(url, session)
-
-            z = zipfile.ZipFile(f)
-
-            # for each file in zip file
-            for entry in z.infolist():
-
-                # skip directories in zip file (will be created automatically)
-                if entry.is_dir():
-                    continue
-
-                path = os.path.join(args.directory, entry.filename)
-
-                contains_all_words = all(
-                    word in entry.filename for words in args.contains for word in words
-                )
-
-                if args.list:
-                    if contains_all_words:
-                        print(entry.filename)
-                else:
-                    if contains_all_words:
-                        if os.path.isfile(path) and not args.overwrite:
-                            print("File already exists:", path)
-                        else:
-                            print("Downloading:", path)
-
-                            z.extract(entry.filename, args.directory)
-                    else:
-                        if not args.silent:
-                            print("Skipping:", path)
-
-
 def main():
     epilog = """
 
@@ -636,6 +548,89 @@ example: print this help text
     args = parser.parse_args()
 
     download_files(args)
+
+
+def download_files(args):
+    session = requests.session()
+
+    # For each zip file
+    for url in URLS:
+        if args.scene is None or args.scene in url:
+            f = WebFile(url, session)
+
+            z = zipfile.ZipFile(f)
+
+            # for each file in zip file
+            for entry in z.infolist():
+                # skip directories in zip file (will be created automatically)
+                if entry.is_dir():
+                    continue
+
+                path = os.path.join(args.directory, entry.filename)
+
+                contains_all_words = all(
+                    word in entry.filename for words in args.contains for word in words
+                )
+
+                if args.list:
+                    if contains_all_words:
+                        print(entry.filename)
+                else:
+                    if contains_all_words:
+                        if os.path.isfile(path) and not args.overwrite:
+                            print("File already exists:", path)
+                        else:
+                            print("Downloading:", path)
+
+                            z.extract(entry.filename, args.directory)
+                    else:
+                        if not args.silent:
+                            print("Skipping:", path)
+
+
+class WebFile:
+    def __init__(self, url, session):
+        with session.head(url) as response:
+            size = int(response.headers["content-length"])
+
+        self.url = url
+        self.session = session
+        self.offset = 0
+        self.size = size
+
+    def seekable(self):
+        return True
+
+    def tell(self):
+        return self.offset
+
+    def available(self):
+        return self.size - self.offset
+
+    def seek(self, offset, whence=0):
+        if whence == 0:
+            self.offset = offset
+        elif whence == 1:
+            self.offset = min(self.offset + offset, self.size)
+        elif whence == 2:
+            self.offset = max(0, self.size + offset)
+        return self.offset
+
+    def read(self, n=None):
+        n = self.available() if n is None else min(n, self.available())
+
+        end_inclusive = self.offset + n - 1
+
+        headers = {
+            "Range": f"bytes={self.offset}-{end_inclusive}",
+        }
+
+        with self.session.get(self.url, headers=headers) as response:
+            data = response.content
+
+        self.offset += len(data)
+
+        return data
 
 
 if __name__ == "__main__":

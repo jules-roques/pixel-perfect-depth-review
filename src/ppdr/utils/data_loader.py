@@ -3,10 +3,13 @@ Hypersim HDF5 + image data loader for the benchmark.
 """
 
 import os
+from collections.abc import Iterator
+
 import cv2
 import h5py
 import numpy as np
-from typing import Iterator, Tuple, Optional
+
+from ppdr.utils.types import SafeDepth
 
 
 class HypersimLoader:
@@ -21,10 +24,11 @@ class HypersimLoader:
     tuples.
     """
 
-    def __init__(self, data_root: str, max_images: Optional[int] = None):
+    def __init__(self, data_root: str, max_images: int | None = None):
         self.data_root = data_root
         self.entries = sorted(
-            e for e in os.listdir(data_root)
+            e
+            for e in os.listdir(data_root)
             if os.path.isdir(os.path.join(data_root, e))
         )
         if max_images is not None and max_images < len(self.entries):
@@ -33,7 +37,7 @@ class HypersimLoader:
     def __len__(self) -> int:
         return len(self.entries)
 
-    def __iter__(self) -> Iterator[Tuple[np.ndarray, np.ndarray, np.ndarray, str]]:
+    def __iter__(self) -> Iterator[tuple[np.ndarray, SafeDepth, str]]:
         for entry_name in self.entries:
             entry_dir = os.path.join(self.data_root, entry_name)
 
@@ -61,6 +65,6 @@ class HypersimLoader:
             valid_mask = np.isfinite(gt_depth) & (gt_depth > 0)
 
             # Replace NaN/inf with 0 for safe downstream processing
-            gt_depth = np.where(valid_mask, gt_depth, 0.0).astype(np.float32)
+            ground_truth_depth = np.where(valid_mask, gt_depth, 0.0).astype(np.float32)
 
-            yield image_bgr, gt_depth, valid_mask, entry_name
+            yield image_bgr, SafeDepth(ground_truth_depth, valid_mask), entry_name

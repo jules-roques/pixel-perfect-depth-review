@@ -5,14 +5,14 @@ Flying pixels occur at depth discontinuities where the depth map has a high
 spatial gradient NOT supported by a high RGB gradient (i.e. no semantic edge).
 """
 
-import numpy as np
 import cv2
+import numpy as np
 
 # ---------------------------------------------------------------------------
 # Configurable thresholds
 # ---------------------------------------------------------------------------
-DEPTH_GRADIENT_THRESHOLD = 0.05   # Fraction of depth range
-RGB_GRADIENT_THRESHOLD = 30       # Absolute gradient magnitude (0-255 scale)
+DEPTH_GRADIENT_THRESHOLD = 0.05  # Fraction of depth range
+RGB_GRADIENT_THRESHOLD = 30  # Absolute gradient magnitude (0-255 scale)
 
 
 def clean_flying_pixels(
@@ -43,21 +43,20 @@ def clean_flying_pixels(
     depth_f32 = depth.astype(np.float32)
     grad_x = cv2.Sobel(depth_f32, cv2.CV_32F, 1, 0, ksize=3)
     grad_y = cv2.Sobel(depth_f32, cv2.CV_32F, 0, 1, ksize=3)
-    depth_grad_mag = np.sqrt(grad_x ** 2 + grad_y ** 2)
+    depth_grad_mag = np.sqrt(grad_x**2 + grad_y**2)
 
     # ---- RGB gradient magnitude (Sobel on grayscale) -----------------------
-    if rgb.ndim == 3:
-        gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY)
-    else:
-        gray = rgb
+    gray = cv2.cvtColor(rgb, cv2.COLOR_BGR2GRAY) if rgb.ndim == 3 else rgb
     gray = gray.astype(np.float32)
     rgb_gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0, ksize=3)
     rgb_gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1, ksize=3)
-    rgb_grad_mag = np.sqrt(rgb_gx ** 2 + rgb_gy ** 2)
+    rgb_grad_mag = np.sqrt(rgb_gx**2 + rgb_gy**2)
 
     # ---- Identify inconsistent pixels --------------------------------------
     valid = depth > 0
-    depth_range = depth_f32[valid].max() - depth_f32[valid].min() if valid.any() else 1.0
+    depth_range = (
+        depth_f32[valid].max() - depth_f32[valid].min() if valid.any() else 1.0
+    )
     abs_depth_thresh = depth_threshold * depth_range
 
     inconsistent = (depth_grad_mag > abs_depth_thresh) & (rgb_grad_mag < rgb_threshold)
