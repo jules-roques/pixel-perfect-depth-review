@@ -7,10 +7,10 @@
 #   https://github.com/facebookresearch/dino/blob/main/vision_transformer.py
 #   https://github.com/rwightman/pytorch-image-models/tree/master/timm/models/vision_transformer.py
 
-from functools import partial
-import math
 import logging
-from typing import Sequence, Tuple, Union, Callable
+import math
+from collections.abc import Callable, Sequence
+from functools import partial
 
 import torch
 import torch.nn as nn
@@ -18,13 +18,14 @@ import torch.utils.checkpoint
 from torch.nn.init import trunc_normal_
 
 from .dinov2_layers import (
+    MemEffAttention,
     Mlp,
     PatchEmbed,
     SwiGLUFFNFused,
-    MemEffAttention,
+)
+from .dinov2_layers import (
     NestedTensorBlock as Block,
 )
-
 
 logger = logging.getLogger("dinov2")
 
@@ -344,11 +345,11 @@ class DinoVisionTransformer(nn.Module):
     def get_intermediate_layers(
         self,
         x: torch.Tensor,
-        n: Union[int, Sequence] = 1,  # Layers or n last layers to take
+        n: int | Sequence = 1,  # Layers or n last layers to take
         reshape: bool = False,
         return_class_token: bool = False,
         norm=True,
-    ) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor]]]:
+    ) -> tuple[torch.Tensor | tuple[torch.Tensor]]:
         if self.chunked_blocks:
             outputs = self._get_intermediate_layers_chunked(x, n)
         else:

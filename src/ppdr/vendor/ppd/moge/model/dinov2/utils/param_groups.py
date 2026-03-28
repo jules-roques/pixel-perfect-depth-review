@@ -3,9 +3,8 @@
 # This source code is licensed under the Apache License, Version 2.0
 # found in the LICENSE file in the root directory of this source tree.
 
-from collections import defaultdict
 import logging
-
+from collections import defaultdict
 
 logger = logging.getLogger("dinov2")
 
@@ -34,9 +33,7 @@ def get_vit_lr_decay_rate(
             or ".mask_token" in name
             or ".cls_token" in name
             or ".register_tokens" in name
-        ):
-            layer_id = 0
-        elif force_is_backbone and (
+        ) or force_is_backbone and (
             "pos_embed" in name
             or "patch_embed" in name
             or "mask_token" in name

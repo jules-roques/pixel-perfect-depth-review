@@ -1,25 +1,25 @@
-from typing import *
+import warnings
 from numbers import Number
 from pathlib import Path
-import warnings
+from typing import *
+from typing import IO, Any
 
 import numpy as np
 import torch
+import torch.amp
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils
 import torch.utils.checkpoint
-import torch.amp
 import torch.version
 import utils3d
 from huggingface_hub import hf_hub_download
-from typing import Union, Optional, Dict, Any, IO
 
 from ..utils.geometry_torch import (
     normalized_view_plane_uv,
     recover_focal_shift,
 )
-from .modules import DINOv2Encoder, MLP, ConvStack
+from .modules import MLP, ConvStack, DINOv2Encoder
 
 
 class MoGeModel(nn.Module):
@@ -32,17 +32,17 @@ class MoGeModel(nn.Module):
 
     def __init__(
         self,
-        encoder: Dict[str, Any],
-        neck: Dict[str, Any],
-        points_head: Dict[str, Any] = None,
-        mask_head: Dict[str, Any] = None,
-        normal_head: Dict[str, Any] = None,
-        scale_head: Dict[str, Any] = None,
+        encoder: dict[str, Any],
+        neck: dict[str, Any],
+        points_head: dict[str, Any] = None,
+        mask_head: dict[str, Any] = None,
+        normal_head: dict[str, Any] = None,
+        scale_head: dict[str, Any] = None,
         remap_output: Literal["linear", "sinh", "exp", "sinh_exp"] = "linear",
         num_tokens_range: List[int] = [1200, 3600],
         **deprecated_kwargs,
     ):
-        super(MoGeModel, self).__init__()
+        super().__init__()
         if deprecated_kwargs:
             warnings.warn(
                 f"The following deprecated/invalid arguments are ignored: {deprecated_kwargs}"
@@ -82,8 +82,8 @@ class MoGeModel(nn.Module):
     @classmethod
     def from_pretrained(
         cls,
-        pretrained_model_name_or_path: Union[str, Path, IO[bytes]],
-        model_kwargs: Optional[Dict[str, Any]] = None,
+        pretrained_model_name_or_path: str | Path | IO[bytes],
+        model_kwargs: dict[str, Any] | None = None,
         **hf_kwargs,
     ) -> "MoGeModel":
         """
@@ -146,7 +146,7 @@ class MoGeModel(nn.Module):
             raise ValueError(f"Invalid remap output type: {self.remap_output}")
         return points
 
-    def forward_semantics(self, image: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward_semantics(self, image: torch.Tensor) -> dict[str, torch.Tensor]:
         batch_size, _, img_h, img_w = image.shape
         device, dtype = image.device, image.dtype
 
@@ -160,7 +160,7 @@ class MoGeModel(nn.Module):
 
         return semantics
 
-    def forward(self, image: torch.Tensor, num_tokens: int) -> Dict[str, torch.Tensor]:
+    def forward(self, image: torch.Tensor, num_tokens: int) -> dict[str, torch.Tensor]:
         batch_size, _, img_h, img_w = image.shape
         device, dtype = image.device, image.dtype
 
@@ -253,7 +253,7 @@ class MoGeModel(nn.Module):
         resolution_level: int = 9,
         force_projection: bool = True,
         apply_mask: Literal[False, True, "blend"] = True,
-        fov_x: Optional[Union[Number, torch.Tensor]] = None,
+        fov_x: Number | torch.Tensor | None = None,
         use_fp16: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """

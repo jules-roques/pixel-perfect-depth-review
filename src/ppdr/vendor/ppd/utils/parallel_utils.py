@@ -1,18 +1,17 @@
 # copy from EasyVolumetricVideo
 # Author: Zhen Xu https://github.com/dendenxu
 
-from typing import Callable, List, Dict
+import asyncio
+import os
+from collections.abc import Callable
+from functools import wraps
 from multiprocessing.pool import ThreadPool
-from tqdm import tqdm
 from threading import Thread
+
+import imageio
 import torch
 from torch import Tensor
-import imageio
-import os
-
-
-import asyncio
-from functools import wraps
+from tqdm import tqdm
 
 
 def async_call_func(func):
@@ -55,14 +54,14 @@ def cat_dict(
     }
 
 
-def cat_list(list_list: List[List[Tensor]], dim: int = 0):
+def cat_list(list_list: list[list[Tensor]], dim: int = 0):
     return [
         torch.cat([item[i] for item in list_list], dim=dim)
         for i in range(len(list_list[0]))
     ]
 
 
-def cat_tensor(tensor_list: List[Tensor], dim=0):
+def cat_tensor(tensor_list: list[Tensor], dim=0):
     return torch.cat(tensor_list, dim=dim)
 
 
@@ -74,7 +73,7 @@ slice_func = lambda chunk_index, chunk_dim, chunk_size: (
 def chunkify(
     func,
     cat_func,
-    chunk_tensors: List[Tensor],
+    chunk_tensors: list[Tensor],
     chunk_dim: int,
     chunk_size: int,
     **kwargs,
@@ -170,7 +169,7 @@ def parallel_execution(
     # NOTE: we expect first arg / or kwargs to be distributed
     # NOTE: print_progress arg is reserved
 
-    def get_length(args: List, kwargs: Dict):
+    def get_length(args: list, kwargs: dict):
         for a in args:
             if isinstance(a, list):
                 return len(a)
@@ -179,7 +178,7 @@ def parallel_execution(
                 return len(v)
         raise NotImplementedError
 
-    def get_action_args(length: int, args: List, kwargs: Dict, i: int):
+    def get_action_args(length: int, args: list, kwargs: dict, i: int):
         action_args = [
             (arg[i] if isinstance(arg, list) and len(arg) == length else arg)
             for arg in args

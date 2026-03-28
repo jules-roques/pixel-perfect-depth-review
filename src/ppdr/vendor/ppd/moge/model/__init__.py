@@ -16,5 +16,5 @@ def import_model_class_by_version(
     except ModuleNotFoundError:
         raise ValueError(f'Model version "{version}" not found.')
 
-    cls = getattr(module, "MoGeModel")
+    cls = module.MoGeModel
     return cls

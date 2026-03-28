@@ -4,7 +4,6 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 from enum import Enum
-from typing import Union
 
 import torch
 
@@ -27,7 +26,7 @@ def _make_dinov2_model(
     interpolate_antialias: bool = False,
     interpolate_offset: float = 0.1,
     pretrained: bool = True,
-    weights: Union[Weights, str] = Weights.LVD142M,
+    weights: Weights | str = Weights.LVD142M,
     **kwargs,
 ):
     from ..models import vision_transformer as vits
@@ -64,7 +63,7 @@ def _make_dinov2_model(
 
 
 def dinov2_vits14(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-S/14 model (optionally) pretrained on the LVD-142M dataset.
@@ -75,7 +74,7 @@ def dinov2_vits14(
 
 
 def dinov2_vitb14(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-B/14 model (optionally) pretrained on the LVD-142M dataset.
@@ -86,7 +85,7 @@ def dinov2_vitb14(
 
 
 def dinov2_vitl14(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-L/14 model (optionally) pretrained on the LVD-142M dataset.
@@ -97,7 +96,7 @@ def dinov2_vitl14(
 
 
 def dinov2_vitg14(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-g/14 model (optionally) pretrained on the LVD-142M dataset.
@@ -112,7 +111,7 @@ def dinov2_vitg14(
 
 
 def dinov2_vits14_reg(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-S/14 model with registers (optionally) pretrained on the LVD-142M dataset.
@@ -129,7 +128,7 @@ def dinov2_vits14_reg(
 
 
 def dinov2_vitb14_reg(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-B/14 model with registers (optionally) pretrained on the LVD-142M dataset.
@@ -146,7 +145,7 @@ def dinov2_vitb14_reg(
 
 
 def dinov2_vitl14_reg(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-L/14 model with registers (optionally) pretrained on the LVD-142M dataset.
@@ -163,7 +162,7 @@ def dinov2_vitl14_reg(
 
 
 def dinov2_vitg14_reg(
-    *, pretrained: bool = True, weights: Union[Weights, str] = Weights.LVD142M, **kwargs
+    *, pretrained: bool = True, weights: Weights | str = Weights.LVD142M, **kwargs
 ):
     """
     DINOv2 ViT-g/14 model with registers (optionally) pretrained on the LVD-142M dataset.

@@ -4,6 +4,7 @@ Hacked together by / Copyright 2020 Ross Wightman
 """
 
 from functools import partial
+
 from timm.layers.grn import GlobalResponseNorm
 from timm.layers.helpers import to_2tuple
 from torch import nn as nn

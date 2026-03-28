@@ -1,5 +1,5 @@
-from typing import *
 import math
+from typing import *
 
 import torch
 import torch.nn.functional as F

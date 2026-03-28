@@ -1,4 +1,4 @@
-from typing import Union
+
 import torch
 
 
@@ -24,7 +24,7 @@ class Timesteps:
         """
         return len(self.timesteps)
 
-    def __getitem__(self, idx: Union[int, torch.IntTensor]) -> torch.Tensor:
+    def __getitem__(self, idx: int | torch.IntTensor) -> torch.Tensor:
         return self.timesteps[idx]
 
     def index(self, t: torch.Tensor) -> torch.Tensor:

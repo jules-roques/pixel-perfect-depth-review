@@ -1,7 +1,7 @@
-from typing import *
+import functools
 import importlib
 import itertools
-import functools
+from typing import *
 
 import torch
 import torch.nn as nn
@@ -30,7 +30,7 @@ class ResidualConvBlock(nn.Module):
             "group_norm", "layer_norm", "instance_norm"
         ] = "group_norm",
     ):
-        super(ResidualConvBlock, self).__init__()
+        super().__init__()
         if out_channels is None:
             out_channels = in_channels
         if hidden_channels is None:
@@ -108,7 +108,7 @@ class DINOv2Encoder(nn.Module):
         dim_out: int,
         **deprecated_kwargs,
     ):
-        super(DINOv2Encoder, self).__init__()
+        super().__init__()
 
         self.intermediate_layers = intermediate_layers
 

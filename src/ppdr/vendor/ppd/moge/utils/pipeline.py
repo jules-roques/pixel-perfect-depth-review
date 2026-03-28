@@ -1,15 +1,13 @@
-from typing import *
-from abc import abstractmethod
-from queue import Empty, Full
-from threading import Thread
-from queue import Queue
-from multiprocessing import Process
-from threading import Event
+import inspect
+import itertools
 import multiprocessing
 import threading
-import inspect
 import time
-import itertools
+from abc import abstractmethod
+from multiprocessing import Process
+from queue import Empty, Full, Queue
+from threading import Event, Thread
+from typing import *
 
 __all__ = [
     "Node",

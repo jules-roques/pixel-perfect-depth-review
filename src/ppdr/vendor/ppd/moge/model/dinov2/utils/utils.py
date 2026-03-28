@@ -13,7 +13,6 @@ import numpy as np
 import torch
 from torch import nn
 
-
 logger = logging.getLogger("dinov2")
 
 
@@ -33,9 +32,7 @@ def load_pretrained_weights(model, pretrained_weights, checkpoint_key):
     state_dict = {k.replace("backbone.", ""): v for k, v in state_dict.items()}
     msg = model.load_state_dict(state_dict, strict=False)
     logger.info(
-        "Pretrained weights found at {} and loaded with msg: {}".format(
-            pretrained_weights, msg
-        )
+        f"Pretrained weights found at {pretrained_weights} and loaded with msg: {msg}"
     )
 
 
@@ -70,7 +67,7 @@ def get_sha():
     return message
 
 
-class CosineScheduler(object):
+class CosineScheduler:
     def __init__(
         self,
         base_value,
@@ -84,7 +81,7 @@ class CosineScheduler(object):
         self.final_value = final_value
         self.total_iters = total_iters
 
-        freeze_schedule = np.zeros((freeze_iters))
+        freeze_schedule = np.zeros(freeze_iters)
 
         warmup_schedule = np.linspace(start_warmup_value, base_value, warmup_iters)
 

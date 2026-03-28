@@ -6,7 +6,7 @@ from torchvision.transforms import Compose
 
 from .dinov2 import DINOv2
 from .util.blocks import FeatureFusionBlock, _make_scratch
-from .util.transform import Resize, NormalizeImage, PrepareForNet
+from .util.transform import NormalizeImage, PrepareForNet, Resize
 
 
 def _make_fusion_block(features, use_bn, size=None):
@@ -44,7 +44,7 @@ class DPTHead(nn.Module):
         out_channels=[256, 512, 1024, 1024],
         use_clstoken=False,
     ):
-        super(DPTHead, self).__init__()
+        super().__init__()
 
         self.use_clstoken = use_clstoken
 
@@ -177,7 +177,7 @@ class DepthAnythingV2(nn.Module):
         use_bn=False,
         use_clstoken=False,
     ):
-        super(DepthAnythingV2, self).__init__()
+        super().__init__()
 
         # self.intermediate_layer_idx = {
         #     'vits': [2, 5, 8, 11],

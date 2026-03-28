@@ -1,5 +1,6 @@
 from abc import ABC
-from typing import Sequence, Union
+from collections.abc import Sequence
+
 import torch
 from torch.distributions import LogisticNormal
 
@@ -9,12 +10,12 @@ class Timesteps(ABC):
     Timesteps base class.
     """
 
-    def __init__(self, T: Union[int, float]):
+    def __init__(self, T: int | float):
         assert T > 0
         self._T = T
 
     @property
-    def T(self) -> Union[int, float]:
+    def T(self) -> int | float:
         """
         Maximum timestep inclusive.
         int if discrete, float if continuous.
@@ -33,7 +34,7 @@ class LogitNormalTrainingTimesteps(Timesteps):
     Logit-Normal sampling of timesteps in [0, T].
     """
 
-    def __init__(self, T: Union[int, float], loc: float, scale: float):
+    def __init__(self, T: int | float, loc: float, scale: float):
         super().__init__(T)
         self.dist = LogisticNormal(loc, scale)
 

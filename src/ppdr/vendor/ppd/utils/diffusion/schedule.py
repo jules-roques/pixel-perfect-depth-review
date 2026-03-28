@@ -2,7 +2,7 @@
 Linear interpolation schedule (lerp).
 """
 
-from typing import Tuple, Union
+
 import torch
 
 
@@ -15,7 +15,7 @@ class LinearSchedule:
 
     """
 
-    def __init__(self, T: Union[int, float] = 1.0):
+    def __init__(self, T: int | float = 1.0):
         self.T = T
 
     def forward(
@@ -33,7 +33,7 @@ class LinearSchedule:
         pred_type: "velocity",
         x_t: torch.Tensor,
         t: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Convert from velocity prediction. Return predicted x_0 and x_T.
         """

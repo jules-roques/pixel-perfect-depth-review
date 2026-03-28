@@ -5,12 +5,11 @@ from typing import *
 
 import cv2
 import numpy as np
-from numpy import ndarray
-from scipy.sparse import csr_array, vstack
-from scipy.ndimage import convolve
-from scipy.sparse.linalg import lsmr
-
 import utils3d
+from numpy import ndarray
+from scipy.ndimage import convolve
+from scipy.sparse import csr_array, vstack
+from scipy.sparse.linalg import lsmr
 
 
 def get_panorama_cameras():

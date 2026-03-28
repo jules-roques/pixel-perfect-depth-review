@@ -1,8 +1,8 @@
-from typing import *
-from numbers import Number
-from pathlib import Path
 import importlib
 import warnings
+from numbers import Number
+from pathlib import Path
+from typing import *
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,6 @@ import torch.utils.checkpoint
 import torch.version
 import utils3d
 from huggingface_hub import hf_hub_download
-
 
 from ..utils.geometry_torch import normalized_view_plane_uv, recover_focal_shift
 from .utils import wrap_module_with_gradient_checkpointing
@@ -28,7 +27,7 @@ class ResidualConvBlock(nn.Module):
         activation: Literal["relu", "leaky_relu", "silu", "elu"] = "relu",
         norm: Literal["group_norm", "layer_norm"] = "group_norm",
     ):
-        super(ResidualConvBlock, self).__init__()
+        super().__init__()
         if out_channels is None:
             out_channels = in_channels
         if hidden_channels is None:
@@ -279,7 +278,7 @@ class MoGeModel(nn.Module):
         mask_threshold: float = 0.5,
         **deprecated_kwargs,
     ):
-        super(MoGeModel, self).__init__()
+        super().__init__()
 
         if deprecated_kwargs:
             # Process legacy arguments

@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.linear_model import RANSACRegressor
-from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import PolynomialFeatures
 
 degree = 1
 poly_features = PolynomialFeatures(degree=degree, include_bias=False)
@@ -10,6 +10,18 @@ model = make_pipeline(poly_features, ransac)
 
 
 def recover_metric_depth_ransac(pred, gt, mask, log=True):
+    """
+    Recover metric depth from predicted depth using RANSAC.
+
+    Args:
+        pred: Predicted depth map.
+        gt: Ground truth depth map.
+        mask: Mask indicating valid depth values.
+        log: Whether to use log depth.
+
+    Returns:
+        Recovered metric depth map.
+    """
     pred = pred.astype(np.float32)
     gt = gt.astype(np.float32)
 
