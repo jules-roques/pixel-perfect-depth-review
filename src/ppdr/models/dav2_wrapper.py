@@ -6,19 +6,13 @@ commented out, this module reconstructs the full architecture in a new class
 ``_DepthAnythingV2Full`` so the original ``dpt.py`` is never modified.
 """
 
-import cv2
-import numpy as np
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.transforms import Compose
 
 from ppdr.vendor.ppd.models.depth_anything_v2.dpt import DepthAnythingV2, DPTHead
-from ppdr.vendor.ppd.models.depth_anything_v2.util.transform import (
-    NormalizeImage,
-    PrepareForNet,
-    Resize,
-)
 
 from .heuristic import clean_flying_pixels
 from .interface import DepthModel
@@ -33,15 +27,18 @@ class DAv2Cleaned(DepthModel):
         self.dav2 = dav2
 
     @torch.no_grad()
-    def predict(self, bgr: np.ndarray) -> np.ndarray:
+    def predict(self, rgb: torch.Tensor) -> torch.Tensor:
         """
         Predict depth and clean flying pixels.
+
+        Args:
+            rgb: (3, H, W) RGB tensor in [0, 1] or (H, W, 3) uint8 tensor.
 
         Returns:
             cleaned_depth: (H, W) depth with flying pixels zeroed.
         """
-        depth, _ = self.dav2.predict(bgr)
-        cleaned = clean_flying_pixels(depth, bgr)
+        depth = self.dav2.predict(rgb)
+        cleaned = clean_flying_pixels(depth, rgb)
         return cleaned
 
 
@@ -69,15 +66,15 @@ class DAv2(DepthModel):
         self.model = self.model.to(self.device).eval()
 
     @torch.no_grad()
-    def predict(self, bgr: np.ndarray) -> np.ndarray:
+    def predict(self, rgb: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            bgr: (H, W, 3) BGR uint8.
+            rgb: (3, H, W) RGB float tensor in [0, 1] or (H, W, 3) uint8 tensor.
 
         Returns:
-            depth: (H, W) relative depth (float32 numpy).
+            depth: (H, W) relative depth.
         """
-        depth, _ = self.model.infer_image(bgr, input_size=518)
+        depth = self.model.infer_tensor(rgb, input_size=518)
         return depth
 
 
@@ -129,34 +126,38 @@ class _DepthAnythingV2Full(nn.Module):
         return depth.squeeze(1)
 
     @torch.no_grad()
-    def infer_image(self, raw_image: np.ndarray, input_size: int = 518):
-        image, (h, w) = self._image2tensor(raw_image, input_size)
+    def infer_tensor(self, rgb: torch.Tensor, input_size: int = 518) -> torch.Tensor:
+        """
+        Infers depth from a RGB tensor, matching the DAv2 preprocessing.
+        """
+        if rgb.ndim == 3 and rgb.shape[-1] == 3:
+            rgb = rgb.permute(2, 0, 1)
+        if rgb.dtype == torch.uint8:
+            rgb = rgb.float() / 255.0
+
+        h, w = rgb.shape[-2:]
+        if rgb.ndim == 3:
+            rgb = rgb.unsqueeze(0)
+
+        scale = input_size / min(h, w)
+        new_h = int(round(h * scale / 14)) * 14
+        if new_h < input_size:
+            new_h = int(math.ceil(h * scale / 14)) * 14
+
+        new_w = int(round(w * scale / 14)) * 14
+        if new_w < input_size:
+            new_w = int(math.ceil(w * scale / 14)) * 14
+
+        image = F.interpolate(
+            rgb, size=(new_h, new_w), mode="bicubic", align_corners=False
+        )
+        mean = torch.tensor([0.485, 0.456, 0.406], device=image.device).view(1, 3, 1, 1)
+        std = torch.tensor([0.229, 0.224, 0.225], device=image.device).view(1, 3, 1, 1)
+        image = (image - mean) / std
+
         depth = self.forward(image)
         depth = F.interpolate(
-            depth[:, None], (h, w), mode="bilinear", align_corners=True
-        )[0, 0]
-        return depth.cpu().numpy()
+            depth.unsqueeze(1), size=(h, w), mode="bilinear", align_corners=True
+        ).squeeze()
 
-    @staticmethod
-    def _image2tensor(raw_image: np.ndarray, input_size: int = 518):
-        transform = Compose(
-            [
-                Resize(
-                    width=input_size,
-                    height=input_size,
-                    resize_target=False,
-                    keep_aspect_ratio=True,
-                    ensure_multiple_of=14,
-                    resize_method="lower_bound",
-                    image_interpolation_method=cv2.INTER_CUBIC,
-                ),
-                NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                PrepareForNet(),
-            ]
-        )
-        h, w = raw_image.shape[:2]
-        image = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB) / 255.0
-        image = transform({"image": image})["image"]
-        image = torch.from_numpy(image).unsqueeze(0)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        return image.to(device), (h, w)
+        return depth

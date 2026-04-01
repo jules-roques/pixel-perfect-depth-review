@@ -13,10 +13,6 @@ MODELS = {
         "url": "https://huggingface.co/depth-anything/Depth-Anything-V2-Large/resolve/main/depth_anything_v2_vitl.pth?download=true",
         "label": "Depth Anything V2 Large",
     },
-    "moge2.pt": {
-        "url": "https://huggingface.co/Ruicheng/moge-2-vitl-normal/resolve/main/model.pt?download=true",
-        "label": "MoGe2",
-    },
 }
 
 

@@ -1,4 +1,4 @@
-scene_name,M_cam_from_uv_00,M_cam_from_uv_01,M_cam_from_uv_02,M_cam_from_uv_10,M_cam_from_uv_11,M_cam_from_uv_12,M_cam_from_uv_20,M_cam_from_uv_21,M_cam_from_uv_22
+scene_name,uv_to_cam_00,uv_to_cam_01,uv_to_cam_02,uv_to_cam_10,uv_to_cam_11,uv_to_cam_12,uv_to_cam_20,uv_to_cam_21,uv_to_cam_22
 ai_001_001,0.57735028861691,0,0,0,0.433012716462683,0,0,0,-1
 ai_001_002,0.57735028861691,0,0,0,0.433012716462683,0,0,0,-1
 ai_001_003,0.57735028861691,0,0,0,0.433012716462683,0,0,0,-1

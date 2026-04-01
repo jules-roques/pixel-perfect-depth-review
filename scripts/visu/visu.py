@@ -1,22 +1,24 @@
 import matplotlib.pyplot as plt
+import torch
 
 from ppdr.models import PPD, DAv2, DAv2Cleaned
-from ppdr.utils.data_loader import HypersimLoader
+from ppdr.utils.reader import HypersimReader
 
-loader = HypersimLoader("data/hypersim_test_set", 10)
-entry = next(iter(loader))
-bgr = entry[0]
-plt.imsave("results/bgr.png", bgr)
+loader = HypersimReader("data/hypersim_test_set")
+entry_name, rgb, distances, ndc_to_cam = next(iter(loader))
+plt.imsave("results/rgb.png", rgb)
+
+rgb_tensor = torch.from_numpy(rgb)
 
 
 ppd = PPD()
-pred = ppd.predict(bgr)
+pred = ppd.predict(rgb_tensor).cpu().numpy()
 plt.imsave("results/ppd.png", pred)
 
 dav2 = DAv2()
-pred = dav2.predict(bgr)
+pred = dav2.predict(rgb_tensor).cpu().numpy()
 plt.imsave("results/dav2.png", pred)
 
 dav2_cleaned = DAv2Cleaned(dav2)
-pred = dav2_cleaned.predict(bgr)
+pred = dav2_cleaned.predict(rgb_tensor).cpu().numpy()
 plt.imsave("results/dav2_cleaned.png", pred)

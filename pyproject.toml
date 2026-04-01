@@ -6,11 +6,13 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "h5py>=3.14.0",
+    "kornia>=0.8.2",
     "matplotlib>=3.9.4",
     "numpy>=2.0.2",
     "open3d>=0.19.0",
     "opencv-python>=4.13.0.92",
     "pillow>=11.3.0",
+    "pyvista>=0.47.1",
     "scikit-learn>=1.6.1",
     "scipy>=1.13.1",
     "timm==0.9.1",

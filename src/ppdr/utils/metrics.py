@@ -2,11 +2,9 @@
 Edge-Aware Chamfer Distance metric and Canny-based edge masking.
 """
 
-import numpy as np
 import torch
 
-from ppdr.utils.geometry import edge_mask, unproject_depth
-from ppdr.utils.types import Intrinsics
+from ppdr.utils.geometry import depth_to_point_cloud, edge_mask
 
 # ---------------------------------------------------------------------------
 # Configurable parameters
@@ -18,12 +16,11 @@ MAX_POINTS = 10_000
 
 
 def edge_aware_chamfer(
-    pred_depth: np.ndarray,
-    gt_depth: np.ndarray,
-    bgr: np.ndarray,
-    intrinsics: Intrinsics,
-    valid_mask: np.ndarray,
-    device: torch.device | None = None,
+    pred_depth: torch.Tensor,
+    gt_depth: torch.Tensor,
+    rgb: torch.Tensor,
+    m_cam_from_uv: torch.Tensor,
+    valid_mask: torch.Tensor,
     canny_low: int = CANNY_LOW,
     canny_high: int = CANNY_HIGH,
     dilation_px: int = DILATION_PIXELS,
@@ -31,7 +28,7 @@ def edge_aware_chamfer(
     """
     Compute the Edge-Aware Chamfer Distance (GPU-accelerated).
 
-    1. Find edges in ``bgr`` via Canny, dilate.
+    1. Find edges in ``rgb`` via Canny, dilate.
     2. Combine edge mask with ``valid_mask`` and depth > 0 for both pred/GT.
     3. Unproject masked pixels to 3D on ``device``.
     4. Subsample to ``MAX_POINTS`` for tractable GPU distance computation.
@@ -40,35 +37,26 @@ def edge_aware_chamfer(
     Args:
         pred_depth: (H, W) predicted *planar* depth.
         gt_depth:   (H, W) ground-truth *planar* depth.
-        bgr:        (H, W, 3) uint8 image (BGR or RGB).
-        intrinsics: Camera intrinsics.
+        rgb:        (H, W, 3) uint8 image (RGB).
+        m_cam_from_uv: Camera intrinsics matrix mapped to NDC.
         valid_mask: (H, W) boolean mask indicating valid GT pixels.
-        device:     Torch device for the distance computation (default: CPU).
         canny_low, canny_high: Canny edge thresholds.
         dilation_px: Dilation radius for the edge mask.
 
     Returns:
         Chamfer Distance (scalar float).
     """
-    if device is None:
-        device = torch.device("cpu")
 
-    edges = edge_mask(bgr, canny_low, canny_high, dilation_px)
+    edges = edge_mask(rgb, canny_low, canny_high, dilation_px)
     mask = valid_mask & edges & (pred_depth > 0) & (gt_depth > 0)
 
     if mask.sum() < 10:
         return float("nan")
 
-    pred_pts = unproject_depth(pred_depth, intrinsics, mask, device)
-    gt_pts = unproject_depth(gt_depth, intrinsics, mask, device)
+    pred_pts = depth_to_point_cloud(pred_depth, m_cam_from_uv, mask)
+    gt_pts = depth_to_point_cloud(gt_depth, m_cam_from_uv, mask)
 
-    if len(pred_pts) < 2 or len(gt_pts) < 2:
-        return float("nan")
-
-    pred_pts = _subsample(pred_pts, MAX_POINTS)
-    gt_pts = _subsample(gt_pts, MAX_POINTS)
-
-    return _chamfer_distance_gpu(pred_pts, gt_pts)
+    return _chamfer_distance(pred_pts, gt_pts)
 
 
 def _subsample(points: torch.Tensor, max_points: int) -> torch.Tensor:
@@ -80,7 +68,7 @@ def _subsample(points: torch.Tensor, max_points: int) -> torch.Tensor:
 
 
 @torch.no_grad()
-def _chamfer_distance_gpu(A: torch.Tensor, B: torch.Tensor) -> float:
+def _chamfer_distance(A: torch.Tensor, B: torch.Tensor) -> float:
     """
     Bidirectional Chamfer Distance on GPU using ``torch.cdist``.
 

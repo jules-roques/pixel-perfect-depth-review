@@ -21,7 +21,7 @@ def main():
     parser.add_argument(
         "--metadata",
         type=str,
-        default="data/metadata_test_set.csv",
+        default="data/test_set_entries_names.csv",
         help="Path to test set metadata CSV",
     )
     parser.add_argument(

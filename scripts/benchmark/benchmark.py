@@ -3,43 +3,35 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from typing import Any
 
-import cv2
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
-from ppdr.models import PPD, DAv2, DAv2Cleaned, MoGe
+from ppdr.models import PPD, DAv2, DAv2Cleaned
 from ppdr.models.interface import DepthModel
-from ppdr.utils.data_loader import HypersimLoader
-from ppdr.utils.geometry import euclidean_to_planar
+from ppdr.utils.dataset import HypersimDataset
 from ppdr.utils.metrics import edge_aware_chamfer
-from ppdr.utils.types import EvalMetrics, ImageContext, SafeDepth
+from ppdr.utils.reader import HypersimReader
 from ppdr.vendor.ppd.utils.align_depth_func import recover_metric_depth_ransac
-from ppdr.vendor.ppd.utils.transform import resize_keep_aspect
 from ppdr.visualization import generate_plots
 
 DATA_ROOT: str = "data/hypersim_test_set"
 OUTPUT_DIR: str = "results"
 WARMUP: int = 5
-MOGE_CHECKPOINT: str = "checkpoints/moge2.pt"
 MAX_ITERATIONS: int = 10000
 
 
 @dataclass
 class ModelResults:
-    metrics: dict[str, EvalMetrics]
+    inference_times: list[float]
+    chamfer_distances: list[float]
 
     def get_avg_inference_time(self) -> float:
-        return float(np.mean([m.inference_time for m in self.metrics.values()]))
+        return float(np.mean(self.inference_times))
 
     def get_avg_chamfer_distance(self) -> float:
-        valid_cd = [
-            m.chamfer_distance
-            for m in self.metrics.values()
-            if m.chamfer_distance is not None
-        ]
-        return float(np.mean(valid_cd)) if valid_cd else float("nan")
+        return float(np.mean(self.chamfer_distances))
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,17 +51,14 @@ def main() -> None:
     print(f"Using device: {device}")
 
     print("Loading dataset...")
-    loader = HypersimLoader(args.data_root, max_images=args.max_images)
-
-    # We store all contexts in the RAM, which is not ideal for large datasets
-    print("Preparing image contexts (MoGe extraction)...")
-    moge = MoGe(MOGE_CHECKPOINT, device)
-    contexts = prepare_all_contexts(loader, moge, device)
+    reader = HypersimReader(args.data_root)
+    dataset = HypersimDataset(reader)
+    loader = DataLoader(dataset, batch_size=1, shuffle=False)
 
     print("Loading and evaluating models...")
     models = load_all_inference_models(device)
-    first_img = next(iter(loader), (None,))[0]
-    results = evaluate_all(models, contexts, first_img, args.warmup)
+    first_img, _, _, _ = dataset[0]
+    results = evaluate_all_models(models, loader, first_img, args.warmup)
 
     print("Saving and plotting...")
     save_and_plot(results, args.output_dir)
@@ -87,54 +76,45 @@ def load_all_inference_models(device: torch.device) -> dict[str, DepthModel]:
     return models
 
 
-def prepare_all_contexts(
-    loader: HypersimLoader, moge: MoGe, device: torch.device
-) -> list[ImageContext]:
-    contexts = []
-    for idx, (bgr, gt_depth, name) in enumerate(loader):
-        if idx >= MAX_ITERATIONS:
-            break
-        ctx = prepare_image_context(name, bgr, gt_depth, moge, device)
-        contexts.append(ctx)
-    return contexts
-
-
 def warmup_model(
-    model: DepthModel, warmup_img: np.ndarray | None, warmup_iters: int
+    model: DepthModel, warmup_img: torch.Tensor, warmup_iters: int
 ) -> None:
-    if warmup_img is not None:
-        execute_warmup(model, warmup_img, warmup_iters)
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-
-
-def execute_warmup(model: Any, bgr: np.ndarray, iters: int) -> None:
-    iters = min(iters, MAX_ITERATIONS)
+    iters = min(warmup_iters, MAX_ITERATIONS)
     for _ in range(iters):
-        model.predict(bgr)
+        model.predict(warmup_img)
     if torch.cuda.is_available():
         torch.cuda.synchronize()
 
 
-def evaluate_all(
+def evaluate_all_models(
     models: dict[str, DepthModel],
-    contexts: list[ImageContext],
-    warmup_img: np.ndarray | None,
+    loader: DataLoader,
+    warmup_img: torch.Tensor,
     warmup_iters: int,
 ) -> dict[str, ModelResults]:
+
     results: dict[str, ModelResults] = {}
-
     for model_name, model in models.items():
-        print(f"Warming up model: {model_name}...")
-        warmup_model(model, warmup_img, warmup_iters)
-
         print(f"Evaluating model: {model_name}...")
-        metrics = {}
-        for ctx in contexts:
-            metrics[ctx.name] = evaluate_model_on_image(model, ctx)
-        results[model_name] = ModelResults(metrics=metrics)
+        warmup_model(model, warmup_img, warmup_iters)
+        results[model_name] = evaluate_one_model(model, loader)
 
     return results
+
+
+def evaluate_one_model(
+    model: DepthModel,
+    loader: DataLoader,
+) -> ModelResults:
+    chamfer_distances: list[float] = []
+    inference_times: list[float] = []
+    for entry in loader:
+        chamfer_distance, inference_time = evaluate_model_on_entry(model, entry)
+        chamfer_distances.append(chamfer_distance)
+        inference_times.append(inference_time)
+    return ModelResults(
+        chamfer_distances=chamfer_distances, inference_times=inference_times
+    )
 
 
 def save_and_plot(results: dict[str, ModelResults], output_dir: str) -> None:
@@ -152,79 +132,30 @@ def save_and_plot(results: dict[str, ModelResults], output_dir: str) -> None:
     generate_plots(json_path, os.path.join(output_dir, "results.png"))
 
 
-def prepare_image_context(
-    name: str,
-    bgr: np.ndarray,
-    gt_euclidean: SafeDepth,
-    moge: MoGe,
-    device: torch.device,
-) -> ImageContext:
-    resized_bgr = resize_keep_aspect(bgr)
-    h, w = resized_bgr.shape[:2]
+def evaluate_model_on_entry(
+    model: DepthModel,
+    entry: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
+) -> tuple[float, float]:
+    image, true_depth, valid_mask, ndc_to_cam = entry
+    pred_depth, elapsed = time_prediction(model, image)
 
-    resized_gt_euc = cv2.resize(
-        gt_euclidean.depth, (w, h), interpolation=cv2.INTER_NEAREST
-    )
-    resized_valid = cv2.resize(
-        gt_euclidean.valid_mask.astype(np.uint8),
-        (w, h),
-        interpolation=cv2.INTER_NEAREST,
-    ).astype(bool)
-
-    intrinsics = moge.infer_intrinsics(resized_bgr)
-
-    gt_planar = euclidean_to_planar(resized_gt_euc, intrinsics)
-
-    return ImageContext(
-        name=name,
-        original_bgr=bgr,
-        resized_bgr=resized_bgr,
-        gt_depth=SafeDepth(depth=gt_planar, valid_mask=resized_valid),
-        intrinsics=intrinsics,
-        device=device,
-    )
-
-
-def evaluate_model_on_image(
-    model: Any,
-    ctx: ImageContext,
-) -> EvalMetrics:
-    t0 = time.time()
-    pred_depth, elapsed = time_prediction(model, ctx.original_bgr)
-    t1 = time.time()
-    print(f"Inference time: {t1 - t0}")
-
-    t2 = time.time()
-    h, w = ctx.resized_bgr.shape[:2]
-    res_pred = cv2.resize(pred_depth, (w, h), interpolation=cv2.INTER_LINEAR)
-
-    metric_pred = recover_metric_depth_ransac(
-        res_pred, ctx.moge_depth.depth, ctx.moge_depth.valid_mask
-    )
+    metric_pred = recover_metric_depth_ransac(pred_depth, true_depth, valid_mask)
     cd = edge_aware_chamfer(
         metric_pred,
-        ctx.gt_depth.depth,
-        ctx.resized_bgr,
-        ctx.intrinsics,
-        ctx.gt_depth.valid_mask,
-        device=ctx.device,
+        true_depth,
+        image,
+        ndc_to_cam,
+        valid_mask,
     )
-    t3 = time.time()
-    print(f"Measure Time: {t3 - t2}")
 
-    valid_cd = cd if np.isfinite(cd) else None
-
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-
-    return EvalMetrics(inference_time=elapsed, chamfer_distance=valid_cd)
+    return cd, elapsed
 
 
-def time_prediction(model: DepthModel, bgr: np.ndarray) -> tuple[np.ndarray, float]:
+def time_prediction(model: DepthModel, rgb: torch.Tensor) -> tuple[torch.Tensor, float]:
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     start = time.perf_counter()
-    depth = model.predict(bgr)
+    depth = model.predict(rgb)
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     return depth, (time.perf_counter() - start) * 1000.0

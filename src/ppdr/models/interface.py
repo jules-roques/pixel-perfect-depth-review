@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 
-import numpy as np
+import torch
 
 
 class DepthModel(ABC):
     @abstractmethod
-    def predict(self, bgr: np.ndarray) -> np.ndarray:
+    def predict(self, rgb: torch.Tensor) -> torch.Tensor:
         pass
