@@ -13,5 +13,4 @@ dist/
 *.egg
 sandbox/
 output/
-results/
 .vscode
