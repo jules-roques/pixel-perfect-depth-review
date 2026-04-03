@@ -18,7 +18,6 @@ def clean_flying_pixels(
     d_n = (d - d_min) / (d_max - d_min + 1e-8)
 
     # ── Soft depth gradient (Kornia Sobel) ────────────────────────────────
-    # Returns normalised gradient magnitude in [0, 1], shape (B, 1, H, W)
     depth_grad = K.filters.sobel(d_n)
     depth_grad_n = depth_grad / (
         depth_grad.flatten(2).max(-1).values.view(B, 1, 1, 1) + 1e-8

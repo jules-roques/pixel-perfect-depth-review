@@ -10,7 +10,6 @@ from ppdr.utils.benchmark import Benchmark
 from ppdr.utils.dataset import HypersimDataset
 from ppdr.utils.metrics import Metrics
 from ppdr.utils.reader import HypersimReader
-from ppdr.visualization import generate_plots
 
 DATA_ROOT: str = "data/hypersim_test_set"
 OUTPUT_DIR: str = "results"
@@ -62,7 +61,6 @@ def main() -> None:
 
     print_summary(results)
     save_results(results, args.output_dir)
-    generate_plots(results, args.output_dir)
 
 
 def print_summary(results: dict[str, Metrics]) -> None:
@@ -74,9 +72,10 @@ def print_summary(results: dict[str, Metrics]) -> None:
 def save_results(results: dict[str, Metrics], output_dir: str) -> None:
     os.makedirs(output_dir, exist_ok=True)
     json_path = os.path.join(output_dir, "results.json")
+    data = {name: res.to_dict() for name, res in results.items()}
     with open(json_path, "w") as f:
-        json.dump(results, f, indent=2, default=str)
-    print("Results saved to", json_path)
+        json.dump(data, f, indent=2, default=str)
+    print(f"Results saved to {json_path}")
 
 
 if __name__ == "__main__":

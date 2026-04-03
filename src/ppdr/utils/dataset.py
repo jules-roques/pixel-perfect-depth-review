@@ -1,7 +1,7 @@
 import torch
 from torch.utils.data import Dataset
 
-from ppdr.utils.geometry import distances_from_camera_to_depth
+from ppdr.utils.geometry import create_valid_depth_mask, distances_from_camera_to_depth
 from ppdr.utils.reader import HypersimReader
 from ppdr.utils.transform import image_array2tensor, linear_to_rgb
 
@@ -39,8 +39,3 @@ class HypersimDataset(Dataset):
     def get_entry_by_name(self, name: str) -> dict[str, torch.Tensor]:
         index = self.reader.get_entry_index_from_name(name)
         return self.__getitem__(index)
-
-
-def create_valid_depth_mask(depth: torch.Tensor) -> torch.Tensor:
-    """Create a boolean mask identifying valid depth pixels."""
-    return (depth > 0.0) & (~torch.isinf(depth)) & (~torch.isnan(depth))

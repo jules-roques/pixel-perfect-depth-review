@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from ppdr.models.interface import DepthModel
-from ppdr.utils.geometry import recover_metric_depth_from_log
+from ppdr.utils.geometry import create_valid_depth_mask, recover_metric_depth_from_log
 from ppdr.vendor.ppd.models.ppd import PixelPerfectDepth
 
 
@@ -36,7 +36,7 @@ class PPD(DepthModel):
         self.model = self.model.to(self.device).eval()
 
     @torch.no_grad()
-    def _predict(self, rgb: torch.Tensor) -> torch.Tensor:
+    def _predict(self, rgb: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
 
         ori_h, ori_w = rgb.shape[-2:]
 
@@ -66,12 +66,16 @@ class PPD(DepthModel):
             depth_tensor = self.model.forward_test(image)
 
         # 7. Resize back to original resolution
-        return F.interpolate(
+        pred_depth = F.interpolate(
             depth_tensor,
             size=(ori_h, ori_w),
             mode="bilinear",
             align_corners=True,
         ).squeeze(1)
+
+        pred_mask = create_valid_depth_mask(pred_depth)
+
+        return pred_depth, pred_mask
 
     def align_pred_on_metric_depth(
         self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor

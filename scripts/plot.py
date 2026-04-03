@@ -1,12 +1,44 @@
+import argparse
+import json
 import os
-from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-if TYPE_CHECKING:
-    from ppdr.utils.metrics import Metrics
+from ppdr.utils.metrics import Metrics
+
+# ── I/O ────────────────────────────────────────────────────────────────────────
+
+
+def load_results(json_path: str) -> dict[str, Metrics]:
+    """Deserialise a results JSON produced by save_results() into Metrics objects."""
+    with open(json_path) as f:
+        raw = json.load(f)
+    return {name: Metrics(**fields) for name, fields in raw.items()}
+
+
+def remove_nan_values(results: dict[str, Metrics]) -> None:
+    for metrics in results.values():
+        metrics.chamfer_distances = [
+            d for d in metrics.chamfer_distances if not np.isnan(d)
+        ]
+        metrics.precisions = [p for p in metrics.precisions if not np.isnan(p)]
+        metrics.recalls = [r for r in metrics.recalls if not np.isnan(r)]
+        metrics.fscores = [f for f in metrics.fscores if not np.isnan(f)]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--results_json", type=str, default="results/results.json")
+    parser.add_argument("--output_dir", type=str, default="results")
+    args = parser.parse_args()
+
+    results = load_results(args.results_json)
+    remove_nan_values(results)
+    generate_plots(results, args.output_dir)
+    print(f"Plots generated in '{args.output_dir}' folder")
+
 
 # ── Palette: one colour per model, consistent across all plots ─────────────────
 _PALETTE = ["#4C72B0", "#DD8452", "#55A868", "#C44E52", "#8172B3", "#937860"]
@@ -24,6 +56,7 @@ def _boxplot(
     title: str,
     ylabel: str,
     formatter: ticker.Formatter | None = None,
+    use_log: bool = False,
 ) -> None:
     positions = np.arange(len(model_names))
     bp = ax.boxplot(
@@ -52,6 +85,11 @@ def _boxplot(
     ax.set_xticklabels(model_names, fontsize=9)
     ax.yaxis.grid(True, linestyle="--", alpha=0.5)
     ax.set_axisbelow(True)
+
+    if use_log:
+        ax.set_yscale("symlog", linthresh=1.0)
+        
+
     if formatter is not None:
         ax.yaxis.set_major_formatter(formatter)
 
@@ -103,7 +141,6 @@ def generate_plots(
         os.path.join(output_dir, "depth_scores.png"), dpi=150, bbox_inches="tight"
     )
     plt.close(fig)
-    print("Saved depth_scores.png")
 
     # ── 2. Inference time ──────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -123,7 +160,6 @@ def generate_plots(
         os.path.join(output_dir, "inference_time.png"), dpi=150, bbox_inches="tight"
     )
     plt.close(fig)
-    print("Saved inference_time.png")
 
     # ── 3. Chamfer distance ────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(6, 5))
@@ -136,6 +172,7 @@ def generate_plots(
         colors=colors,
         title="Chamfer Distance",
         ylabel="Distance",
+        use_log=True,
     )
 
     fig.tight_layout()
@@ -143,4 +180,7 @@ def generate_plots(
         os.path.join(output_dir, "chamfer_distance.png"), dpi=150, bbox_inches="tight"
     )
     plt.close(fig)
-    print("Saved chamfer_distance.png")
+
+
+if __name__ == "__main__":
+    main()

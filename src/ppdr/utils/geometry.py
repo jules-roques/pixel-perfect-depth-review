@@ -130,3 +130,8 @@ def recover_metric_depth_from_disparity(
     aligned_disp = torch.clamp(aligned_disp, min=1e-6)  # prevent /0 and neg depth
     pred_metric = 1.0 / aligned_disp
     return torch.clamp(pred_metric, min=1e-3, max=gt[mask].max().item())
+
+
+def create_valid_depth_mask(depth: torch.Tensor) -> torch.Tensor:
+    """Create a boolean mask identifying valid depth pixels."""
+    return (depth > 0.0) & (~torch.isinf(depth)) & (~torch.isnan(depth))

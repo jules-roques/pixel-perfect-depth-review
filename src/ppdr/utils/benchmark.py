@@ -13,6 +13,14 @@ from ppdr.utils.metrics import Metrics, depth_fscore, edge_aware_chamfer
 class Benchmark:
     """Runs depth-model benchmarks on a given dataset."""
 
+    # Canny edge detection parameters (strict to find main edges)
+    CANNY_LOW = 0.8
+    CANNY_HIGH = 0.9
+    DILATION_PX = 0
+
+    # Ratio threshold for fscore computation
+    DELTA = 1.25
+
     def __init__(self, dataset: HypersimDataset) -> None:
         self.dataset = dataset
 
@@ -82,28 +90,41 @@ class Benchmark:
     ) -> Metrics:
         images = batch["image"].to(model.device)
         true_depths = batch["depth"].to(model.device)
-        valid_masks = batch["valid_mask"].to(model.device)
+        gt_valid_masks = batch["valid_mask"].to(model.device)
         ndc_to_cams = batch["ndc_to_cam"].to(model.device)
+        B = images.shape[0]
 
-        pred, time_elapsed = Benchmark._time_prediction(model, images)
-        metric_depth = model.align_pred_on_metric_depth(pred, true_depths, valid_masks)
+        pred_depths, pred_masks, time_elapsed = Benchmark._time_prediction(
+            model, images
+        )
+
+        metric_depth = model.align_pred_on_metric_depth(
+            pred_depths, true_depths, gt_valid_masks
+        )
+
         chamfer_distances = edge_aware_chamfer(
-            metric_depth,
-            true_depths,
-            images,
-            ndc_to_cams,
-            valid_masks,
+            pred_depth=metric_depth,
+            gt_depth=true_depths,
+            rgb=images,
+            m_cam_from_uv=ndc_to_cams,
+            valid_mask=gt_valid_masks,
+            pred_mask=pred_masks,
+            canny_low=Benchmark.CANNY_LOW,
+            canny_high=Benchmark.CANNY_HIGH,
+            dilation_px=Benchmark.DILATION_PX,
         )
 
         fscores_dict = depth_fscore(
             metric_depth,
             true_depths,
-            valid_masks,
+            gt_valid_masks,
+            pred_masks,
+            delta=Benchmark.DELTA,
         )
 
         return Metrics(
             chamfer_distances=chamfer_distances,
-            inference_times=[time_elapsed / images.shape[0]] * images.shape[0],
+            inference_times=[time_elapsed / B] * B,
             precisions=fscores_dict["precisions"],
             recalls=fscores_dict["recalls"],
             fscores=fscores_dict["fscores"],
@@ -112,11 +133,11 @@ class Benchmark:
     @staticmethod
     def _time_prediction(
         model: DepthModel, rgb: torch.Tensor
-    ) -> tuple[torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, torch.Tensor, float]:
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         start = time.perf_counter()
-        depth = model.predict(rgb)
+        depth, mask = model.predict(rgb)
         if torch.cuda.is_available():
             torch.cuda.synchronize()
-        return depth, (time.perf_counter() - start) * 1000.0
+        return depth, mask, (time.perf_counter() - start) * 1000.0

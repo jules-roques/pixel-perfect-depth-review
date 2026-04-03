@@ -1,7 +1,3 @@
-"""
-Edge-Aware Chamfer Distance metric and Canny-based edge masking.
-"""
-
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -41,26 +37,32 @@ class Metrics:
         for k, v in self.mean().items():
             print(f"  {k}: {v:.4f}")
 
+    def to_dict(self) -> dict[str, list[float]]:
+        return {
+            "chamfer_distances": self.chamfer_distances,
+            "inference_times": self.inference_times,
+            "precisions": self.precisions,
+            "recalls": self.recalls,
+            "fscores": self.fscores,
+        }
+
 
 def depth_fscore(
-    pred: torch.Tensor,  # (B, H, W), 0 = masked
+    pred: torch.Tensor,  # (B, H, W) metric depth
     gt: torch.Tensor,  # (B, H, W)
     valid: torch.Tensor,  # (B, H, W) GT valid mask
-    delta: float = 1.25,
+    pred_mask: torch.Tensor,  # (B, H, W) False = flying pixel
+    delta: float,
 ) -> dict[str, list[float]]:
-    """
-    Computes F-score per image in the batch.
-    Returns lists of length B — one scalar per image.
-    """
     B = pred.shape[0]
     precisions, recalls, fscores = [], [], []
 
     for b in range(B):
-        p = pred[b]  # (H, W)
-        g = gt[b]  # (H, W)
-        v = valid[b]  # (H, W)
+        p = pred[b]
+        g = gt[b]
+        v = valid[b]
 
-        pred_valid = v & (p > 0)  # unmasked AND GT-valid
+        pred_valid = v & pred_mask[b]
 
         if pred_valid.sum() == 0 or v.sum() == 0:
             precisions.append(0.0)
@@ -68,14 +70,11 @@ def depth_fscore(
             fscores.append(0.0)
             continue
 
-        # Ratio only on valid pred pixels — no spurious zeros
         ratio = torch.maximum(
             p[pred_valid] / g[pred_valid],
             g[pred_valid] / p[pred_valid],
-        )  # (N,)  N = #pred_valid pixels
-
-        accurate = ratio < delta  # (N,) bool
-
+        )
+        accurate = ratio < delta
         precision = accurate.float().mean()
         recall = accurate.float().sum() / (v.float().sum() + 1e-8)
         fscore = 2 * precision * recall / (precision + recall + 1e-8)
@@ -87,20 +86,17 @@ def depth_fscore(
     return {"precisions": precisions, "recalls": recalls, "fscores": fscores}
 
 
-CANNY_LOW = 0.8
-CANNY_HIGH = 0.9
-DILATION_PX = 0
-
-
 def edge_aware_chamfer(
+    *,
     pred_depth: torch.Tensor,
     gt_depth: torch.Tensor,
     rgb: torch.Tensor,
     m_cam_from_uv: torch.Tensor,
     valid_mask: torch.Tensor,
-    canny_low: float = CANNY_LOW,
-    canny_high: float = CANNY_HIGH,
-    dilation_px: int = DILATION_PX,
+    pred_mask: torch.Tensor,
+    canny_low: float,
+    canny_high: float,
+    dilation_px: int,
 ) -> list[float]:
     """
     Compute the Edge-Aware Chamfer Distance.
@@ -123,28 +119,25 @@ def edge_aware_chamfer(
         Chamfer Distance (scalar float).
     """
 
-    assert pred_depth.ndim == 3  # shape (B, H, W)
-    assert gt_depth.ndim == 3  # shape (B, H, W)
-    assert rgb.ndim == 4 and rgb.shape[1] == 3  # shape (B, 3, H, W)
-    assert valid_mask.ndim == 3  # shape (B, H, W)
-    assert m_cam_from_uv.ndim == 3  # shape (B, 3, 3)
-
     edges = edge_mask(rgb, canny_low, canny_high, dilation_px)
-    mask = valid_mask & edges
+    gt_mask = valid_mask & edges
+    pred_combined = gt_mask & pred_mask
 
-    b = pred_depth.shape[0]
+    B = pred_depth.shape[0]
     chamfer_distances = []
-    for i in range(b):  # vectorizing masked point clouds is not ideal
-        pred_pts = depth_to_point_cloud(pred_depth[i], m_cam_from_uv[i], mask[i])
-        gt_pts = depth_to_point_cloud(gt_depth[i], m_cam_from_uv[i], mask[i])
-        chamfer_distances.append(_chamfer_distance(pred_pts, gt_pts))
+    for i in range(B):
+        pred_pts = depth_to_point_cloud(
+            pred_depth[i], m_cam_from_uv[i], pred_combined[i]
+        )
+        gt_pts = depth_to_point_cloud(gt_depth[i], m_cam_from_uv[i], gt_mask[i])
+        chamfer_distances.append(chamfer_distance(pred_pts, gt_pts))
 
     return chamfer_distances
 
 
 # KDTrees on GPU are not easy to use, so we do it on CPU
 @torch.no_grad()
-def _chamfer_distance(A: torch.Tensor, B: torch.Tensor) -> float:
+def chamfer_distance(A: torch.Tensor, B: torch.Tensor) -> float:
     """
     Fast CPU KD-Tree implementation of Chamfer Distance.
     """
