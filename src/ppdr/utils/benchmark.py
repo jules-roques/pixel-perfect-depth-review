@@ -14,9 +14,13 @@ class Benchmark:
     """Runs depth-model benchmarks on a given dataset."""
 
     # Canny edge detection parameters (strict to find main edges)
-    CANNY_LOW = 0.8
-    CANNY_HIGH = 0.9
-    DILATION_PX = 0
+    CANNY_LOW = 0.2
+    CANNY_HIGH = 0.5
+    DILATION_PX = 1
+
+    # Normalised Canny thresholds for depth edge detection
+    DEPTH_CANNY_LOW = 0.2
+    DEPTH_CANNY_HIGH = 0.5
 
     # Ratio threshold for fscore computation
     DELTA = 1.25
@@ -112,6 +116,8 @@ class Benchmark:
             canny_low=Benchmark.CANNY_LOW,
             canny_high=Benchmark.CANNY_HIGH,
             dilation_px=Benchmark.DILATION_PX,
+            depth_canny_low=Benchmark.DEPTH_CANNY_LOW,
+            depth_canny_high=Benchmark.DEPTH_CANNY_HIGH,
         )
 
         fscores_dict = depth_fscore(

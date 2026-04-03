@@ -30,6 +30,45 @@ def edge_mask(
     return dilated > 0
 
 
+def depth_canny_edge_mask(
+    depth: torch.Tensor,
+    canny_low: float = 0.05,
+    canny_high: float = 0.1,
+    dilation_px: int = 0,
+) -> torch.Tensor:
+    """
+    Compute an edge mask from the depth map using Canny.
+
+    Args:
+        depth: (B, H, W) depth map.
+        canny_low: Low threshold for Canny.
+        canny_high: High threshold for Canny.
+        dilation_px: Dilation radius for the edge mask.
+
+    Returns:
+        (B, H, W) boolean mask, True at depth-edge pixels.
+    """
+    B = depth.shape[0]
+    d = depth.unsqueeze(1).float()  # (B, 1, H, W)
+
+    # Normalise depth per image
+    d_min = d.flatten(2).min(-1).values.view(B, 1, 1, 1)
+    d_max = d.flatten(2).max(-1).values.view(B, 1, 1, 1)
+    d_n = (d - d_min) / (d_max - d_min + 1e-8)
+
+    _, edges = K.filters.canny(d_n, low_threshold=canny_low, high_threshold=canny_high)
+    edges = edges.squeeze(1) > 0  # (B, H, W)
+
+    if dilation_px > 0:
+        kernel_size = dilation_px * 2 + 1
+        kernel = torch.ones((kernel_size, kernel_size), device=depth.device)
+        edges = (
+            K.morphology.dilation(edges.float().unsqueeze(1), kernel) > 0
+        ).squeeze(1)
+
+    return edges
+
+
 def distances_from_camera_to_depth(
     distances_from_camera: torch.Tensor, m_cam_from_uv: torch.Tensor
 ) -> torch.Tensor:

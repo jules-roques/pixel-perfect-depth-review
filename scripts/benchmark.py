@@ -11,19 +11,14 @@ from ppdr.utils.dataset import HypersimDataset
 from ppdr.utils.metrics import Metrics
 from ppdr.utils.reader import HypersimReader
 
-DATA_ROOT: str = "data/hypersim_test_set"
-OUTPUT_DIR: str = "results"
-BATCH_SIZE: int = 2
-WARMUP_BATCHES: int = 1
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_root", type=str, default=DATA_ROOT)
-    parser.add_argument("--output_dir", type=str, default=OUTPUT_DIR)
-    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
-    parser.add_argument("--warmup_batches", type=int, default=WARMUP_BATCHES)
-    parser.add_argument("--max_batches", type=int, default=None)
+    parser.add_argument("--data_root", type=str, default="data/hypersim_test_set")
+    parser.add_argument("--output_dir", type=str, default="results")
+    parser.add_argument("--batch_size", type=int, default=2)
+    parser.add_argument("--warmup_batches", type=int, default=1)
+    parser.add_argument("--max_batches", type=int)
     return parser.parse_args()
 
 

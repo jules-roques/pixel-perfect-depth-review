@@ -4,7 +4,11 @@ import numpy as np
 import torch
 from scipy.spatial import KDTree
 
-from ppdr.utils.geometry import depth_to_point_cloud, edge_mask
+from ppdr.utils.geometry import (
+    depth_canny_edge_mask,
+    depth_to_point_cloud,
+    edge_mask,
+)
 
 
 @dataclass
@@ -97,31 +101,47 @@ def edge_aware_chamfer(
     canny_low: float,
     canny_high: float,
     dilation_px: int,
+    depth_canny_low: float = 0.05,
+    depth_canny_high: float = 0.1,
 ) -> list[float]:
     """
     Compute the Edge-Aware Chamfer Distance.
 
-    1. Find edges in ``rgb`` via Canny (must be very strict to find only the main edges).
-    2. Combine edge mask with ``valid_mask`` and depth > 0 for both pred/GT.
-    3. Unproject masked pixels to 3D.
-    4. Return bidirectional Chamfer Distance.
+    GT point cloud is sampled at **RGB edges** (where depth discontinuities
+    *should* be), while the predicted point cloud is sampled at **depth-
+    gradient edges** (where the model *actually* places discontinuities).
+    This makes the metric sensitive to edge sharpness: a model that smooths
+    edges will have depth discontinuities displaced from the true RGB
+    boundaries, yielding a larger chamfer distance.
 
     Args:
         pred_depth: (B, H, W) predicted *planar* depth.
         gt_depth:   (B, H, W) ground-truth *planar* depth.
-        rgb:        (B, H, W, 3) uint8 image (RGB).
+        rgb:        (B, 3, H, W) float image (RGB).
         m_cam_from_uv: Camera intrinsics matrix mapped to NDC.
         valid_mask: (B, H, W) boolean mask indicating valid GT pixels.
-        canny_low, canny_high: Canny edge thresholds.
-        dilation_px: Dilation radius for the edge mask.
+        pred_mask:  (B, H, W) boolean mask indicating valid predicted pixels.
+        canny_low, canny_high: Canny edge thresholds for RGB edges.
+        dilation_px: Dilation radius for the edge masks.
+        depth_canny_low, depth_canny_high: Normalised Canny thresholds for
+            detecting edges in the predicted depth map.
 
     Returns:
-        Chamfer Distance (scalar float).
+        Per-image Chamfer Distance values.
     """
 
-    edges = edge_mask(rgb, canny_low, canny_high, dilation_px)
-    gt_mask = valid_mask & edges
-    pred_combined = gt_mask & pred_mask
+    # GT edges: from RGB — where discontinuities SHOULD be
+    rgb_edges = edge_mask(rgb, canny_low, canny_high, dilation_px)
+    gt_combined = valid_mask & rgb_edges
+
+    # Pred edges: from depth gradient — where discontinuities ARE
+    pred_edges = depth_canny_edge_mask(
+        pred_depth,
+        canny_low=depth_canny_low,
+        canny_high=depth_canny_high,
+        dilation_px=dilation_px,
+    )
+    pred_combined = pred_mask & pred_edges
 
     B = pred_depth.shape[0]
     chamfer_distances = []
@@ -129,7 +149,21 @@ def edge_aware_chamfer(
         pred_pts = depth_to_point_cloud(
             pred_depth[i], m_cam_from_uv[i], pred_combined[i]
         )
-        gt_pts = depth_to_point_cloud(gt_depth[i], m_cam_from_uv[i], gt_mask[i])
+        gt_pts = depth_to_point_cloud(gt_depth[i], m_cam_from_uv[i], gt_combined[i])
+
+        # Normalise point clouds by the median valid ground-truth depth
+        # to ensure the metric is scale-invariant across different scenes
+        valid_z = gt_depth[i][valid_mask[i]]
+        if valid_z.numel() > 0:
+            scale = valid_z.median().item()
+            if scale > 1e-4:
+                pred_pts = pred_pts / scale
+                gt_pts = gt_pts / scale
+
+        if len(pred_pts) == 0 or len(gt_pts) == 0:
+            chamfer_distances.append(float("nan"))
+            continue
+
         chamfer_distances.append(chamfer_distance(pred_pts, gt_pts))
 
     return chamfer_distances
