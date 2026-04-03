@@ -13,9 +13,7 @@ class HypersimDataset(Dataset):
     def __len__(self) -> int:
         return self.reader.get_number_entries()
 
-    def __getitem__(
-        self, index: int
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
 
         image_hdr, distances_from_camera, ndc_to_cam = self.reader.get_entry_by_index(
             index
@@ -31,16 +29,14 @@ class HypersimDataset(Dataset):
 
         valid_mask = create_valid_depth_mask(depth_tensor)
 
-        return (
-            image_tensor,
-            depth_tensor,
-            valid_mask,
-            ndc_to_cam_tensor,
-        )
+        return {
+            "image": image_tensor,
+            "depth": depth_tensor,
+            "valid_mask": valid_mask,
+            "ndc_to_cam": ndc_to_cam_tensor,
+        }
 
-    def get_entry_by_name(
-        self, name: str
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def get_entry_by_name(self, name: str) -> dict[str, torch.Tensor]:
         index = self.reader.get_entry_index_from_name(name)
         return self.__getitem__(index)
 

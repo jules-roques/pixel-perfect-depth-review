@@ -4,19 +4,21 @@ import torch
 
 def image_array2tensor(image: np.ndarray) -> torch.Tensor:
     """
-    Converts an RGB image array (H, W, 3) to a PyTorch tensor (1, 3, H, W).
+    Converts an RGB image array (H, W, 3) to a PyTorch tensor (3, H, W).
     """
+    assert image.ndim == 3 and image.shape[-1] == 3, "Image must be (H, W, 3)"
     image = np.asarray(image).astype(np.float32)
     image = np.transpose(image, (2, 0, 1))
     image = np.ascontiguousarray(image).astype(np.float32)
-    return torch.from_numpy(image).unsqueeze(0)
+    return torch.from_numpy(image)
 
 
 def image_tensor2array(tensor: torch.Tensor) -> np.ndarray:
     """
-    Converts a PyTorch tensor (1, 3, H, W) to an RGB image array (H, W, 3).
+    Converts a PyTorch tensor (3, H, W) to an RGB image array (H, W, 3).
     """
-    image = tensor.squeeze(0).cpu().numpy()
+    assert tensor.ndim == 3 and tensor.shape[0] == 3, "Tensor must be (3, H, W)"
+    image = tensor.cpu().numpy()
     image = np.transpose(image, (1, 2, 0))
     image = np.ascontiguousarray(image).astype(np.float32)
     return image

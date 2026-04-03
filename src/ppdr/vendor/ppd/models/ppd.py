@@ -83,6 +83,7 @@ class PixelPerfectDepth(nn.Module):
             input = torch.cat([latent, cond], dim=1)
             pred = self.dit(x=input, semantics=semantics, timestep=timestep)
             latent = self.sampler.step(pred=pred, x_t=latent, t=timestep)
+        
         return latent + 0.5
 
     @torch.no_grad()

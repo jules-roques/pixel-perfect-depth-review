@@ -12,34 +12,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ppdr.utils.geometry import recover_metric_depth_from_disparity
+from ppdr.utils.heuristic import clean_flying_pixels
 from ppdr.vendor.ppd.models.depth_anything_v2.dpt import DepthAnythingV2, DPTHead
 
-from .heuristic import clean_flying_pixels
 from .interface import DepthModel
-
-
-class DAv2Cleaned(DepthModel):
-    """
-    DAv2 + cross-gradient flying-pixel cleaning filter.
-    """
-
-    def __init__(self, dav2: "DAv2"):
-        self.dav2 = dav2
-
-    @torch.no_grad()
-    def predict(self, rgb: torch.Tensor) -> torch.Tensor:
-        """
-        Predict depth and clean flying pixels.
-
-        Args:
-            rgb: (3, H, W) RGB tensor in [0, 1] or (H, W, 3) uint8 tensor.
-
-        Returns:
-            cleaned_depth: (H, W) depth with flying pixels zeroed.
-        """
-        depth = self.dav2.predict(rgb)
-        cleaned = clean_flying_pixels(depth, rgb)
-        return cleaned
 
 
 class DAv2(DepthModel):
@@ -50,11 +27,9 @@ class DAv2(DepthModel):
     def __init__(
         self,
         model_path: str = "checkpoints/depth_anything_v2_vitl.pth",
-        device: str | None = None,
+        device: str | torch.device | None = None,
     ):
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = torch.device(device)
+        super().__init__(device)
 
         self.model = _DepthAnythingV2Full(
             encoder="vitl",
@@ -66,16 +41,40 @@ class DAv2(DepthModel):
         self.model = self.model.to(self.device).eval()
 
     @torch.no_grad()
-    def predict(self, rgb: torch.Tensor) -> torch.Tensor:
+    def _predict(self, rgb: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            rgb: (3, H, W) RGB float tensor in [0, 1] or (H, W, 3) uint8 tensor.
+            rgb: (B, 3, H, W) RGB float tensor in [0, 1].
 
         Returns:
-            depth: (H, W) relative depth.
+            disparity: (B, H, W) relative disparity.
         """
-        depth = self.model.infer_tensor(rgb, input_size=518)
-        return depth
+        return self.model.infer_tensor(rgb, input_size=518)
+
+    def align_pred_on_metric_depth(
+        self, pred: torch.Tensor, gt: torch.Tensor, mask: torch.Tensor
+    ) -> torch.Tensor:
+        return recover_metric_depth_from_disparity(pred, gt, mask)
+
+
+class DAv2Cleaned(DAv2):
+    """
+    DAv2 + cross-gradient flying-pixel cleaning filter.
+    """
+
+    @torch.no_grad()
+    def _predict(self, rgb: torch.Tensor) -> torch.Tensor:
+        """
+        Predict depth and clean flying pixels.
+
+        Args:
+            rgb: (B, 3, H, W) RGB float tensor in [0, 1].
+
+        Returns:
+            disparity: (B, H, W) relative disparity.
+        """
+        disparity = super()._predict(rgb)
+        return clean_flying_pixels(disparity, rgb)
 
 
 class _DepthAnythingV2Full(nn.Module):
@@ -158,6 +157,6 @@ class _DepthAnythingV2Full(nn.Module):
         depth = self.forward(image)
         depth = F.interpolate(
             depth.unsqueeze(1), size=(h, w), mode="bilinear", align_corners=True
-        ).squeeze()
+        ).squeeze(1)
 
         return depth

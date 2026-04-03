@@ -2,15 +2,17 @@
 Edge-Aware Chamfer Distance metric and Canny-based edge masking.
 """
 
+import numpy as np
 import torch
+from scipy.spatial import KDTree
 
 from ppdr.utils.geometry import depth_to_point_cloud, edge_mask
 
 # ---------------------------------------------------------------------------
 # Configurable parameters
 # ---------------------------------------------------------------------------
-CANNY_LOW = 50
-CANNY_HIGH = 150
+CANNY_LOW = 0.2
+CANNY_HIGH = 0.8
 DILATION_PIXELS = 5
 MAX_POINTS = 10_000
 
@@ -21,10 +23,10 @@ def edge_aware_chamfer(
     rgb: torch.Tensor,
     m_cam_from_uv: torch.Tensor,
     valid_mask: torch.Tensor,
-    canny_low: int = CANNY_LOW,
-    canny_high: int = CANNY_HIGH,
+    canny_low: float = CANNY_LOW,
+    canny_high: float = CANNY_HIGH,
     dilation_px: int = DILATION_PIXELS,
-) -> float:
+) -> list[float]:
     """
     Compute the Edge-Aware Chamfer Distance (GPU-accelerated).
 
@@ -35,11 +37,11 @@ def edge_aware_chamfer(
     5. Return bidirectional Chamfer Distance.
 
     Args:
-        pred_depth: (H, W) predicted *planar* depth.
-        gt_depth:   (H, W) ground-truth *planar* depth.
-        rgb:        (H, W, 3) uint8 image (RGB).
+        pred_depth: (B, H, W) predicted *planar* depth.
+        gt_depth:   (B, H, W) ground-truth *planar* depth.
+        rgb:        (B, H, W, 3) uint8 image (RGB).
         m_cam_from_uv: Camera intrinsics matrix mapped to NDC.
-        valid_mask: (H, W) boolean mask indicating valid GT pixels.
+        valid_mask: (B, H, W) boolean mask indicating valid GT pixels.
         canny_low, canny_high: Canny edge thresholds.
         dilation_px: Dilation radius for the edge mask.
 
@@ -47,34 +49,38 @@ def edge_aware_chamfer(
         Chamfer Distance (scalar float).
     """
 
+    assert pred_depth.ndim == 3  # shape (B, H, W)
+    assert gt_depth.ndim == 3  # shape (B, H, W)
+    assert rgb.ndim == 4 and rgb.shape[1] == 3  # shape (B, 3, H, W)
+    assert valid_mask.ndim == 3  # shape (B, H, W)
+    assert m_cam_from_uv.ndim == 3  # shape (B, 3, 3)
+
     edges = edge_mask(rgb, canny_low, canny_high, dilation_px)
-    mask = valid_mask & edges & (pred_depth > 0) & (gt_depth > 0)
+    mask = valid_mask & edges
 
-    if mask.sum() < 10:
-        return float("nan")
+    b = pred_depth.shape[0]
+    chamfer_distances = []
+    for i in range(b):  # vectorizing masked point clouds is not ideal
+        pred_pts = depth_to_point_cloud(pred_depth[i], m_cam_from_uv[i], mask[i])
+        gt_pts = depth_to_point_cloud(gt_depth[i], m_cam_from_uv[i], mask[i])
+        chamfer_distances.append(_chamfer_distance(pred_pts, gt_pts))
 
-    pred_pts = depth_to_point_cloud(pred_depth, m_cam_from_uv, mask)
-    gt_pts = depth_to_point_cloud(gt_depth, m_cam_from_uv, mask)
-
-    return _chamfer_distance(pred_pts, gt_pts)
-
-
-def _subsample(points: torch.Tensor, max_points: int) -> torch.Tensor:
-    """Uniformly subsample a point cloud if it exceeds ``max_points``."""
-    if len(points) <= max_points:
-        return points
-    indices = torch.randperm(len(points), device=points.device)[:max_points]
-    return points[indices]
+    return chamfer_distances
 
 
+# KDTrees on GPU are not easy to use, so we do it on CPU
 @torch.no_grad()
 def _chamfer_distance(A: torch.Tensor, B: torch.Tensor) -> float:
     """
-    Bidirectional Chamfer Distance on GPU using ``torch.cdist``.
-
-    CD = mean(min_b ||a - b||  for a in A) + mean(min_a ||b - a||  for b in B)
+    Fast CPU KD-Tree implementation of Chamfer Distance.
     """
-    dists = torch.cdist(A.unsqueeze(0), B.unsqueeze(0)).squeeze(0)
-    mean_a2b = dists.min(dim=1).values.mean()
-    mean_b2a = dists.min(dim=0).values.mean()
-    return float(mean_a2b + mean_b2a)
+    A_np = A.cpu().numpy()
+    B_np = B.cpu().numpy()
+
+    tree_A = KDTree(A_np)
+    tree_B = KDTree(B_np)
+
+    dists_b2a, _ = tree_A.query(B_np, k=1, workers=-1)
+    dists_a2b, _ = tree_B.query(A_np, k=1, workers=-1)
+
+    return float(np.mean(dists_a2b) + np.mean(dists_b2a))

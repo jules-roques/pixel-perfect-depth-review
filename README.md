@@ -2,6 +2,24 @@
 
 This project provides wrappers and tools for evaluating depth estimation models, specifically focusing on Pixel-Perfect Depth (PPD).
 
+## Installation with uv
+
+We recommend using [uv](https://docs.astral.sh/uv/) for fast and reliable package management. To install it:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Then, to install all the dependencies and the project in editable mode:
+```bash
+uv sync
+```
+
+## Download data and models
+
+```bash
+uv run scripts/download/download_test_data.py
+uv run scripts/download/download_models.py
+```
+
 ## Third-party Code Attribution
 
 This project includes code from the following third-party source:
