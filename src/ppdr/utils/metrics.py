@@ -87,23 +87,28 @@ def depth_fscore(
     return {"precisions": precisions, "recalls": recalls, "fscores": fscores}
 
 
+CANNY_LOW = 0.8
+CANNY_HIGH = 0.9
+DILATION_PX = 0
+
+
 def edge_aware_chamfer(
     pred_depth: torch.Tensor,
     gt_depth: torch.Tensor,
     rgb: torch.Tensor,
     m_cam_from_uv: torch.Tensor,
     valid_mask: torch.Tensor,
-    canny_low: float = 0.2,
-    canny_high: float = 0.8,
-    dilation_px: int = 5,
+    canny_low: float = CANNY_LOW,
+    canny_high: float = CANNY_HIGH,
+    dilation_px: int = DILATION_PX,
 ) -> list[float]:
     """
-    Compute the Edge-Aware Chamfer Distance (GPU-accelerated).
+    Compute the Edge-Aware Chamfer Distance.
 
-    1. Find edges in ``rgb`` via Canny, dilate.
+    1. Find edges in ``rgb`` via Canny (must be very strict to find only the main edges).
     2. Combine edge mask with ``valid_mask`` and depth > 0 for both pred/GT.
-    3. Unproject masked pixels to 3D on ``device``.
-    5. Return bidirectional Chamfer Distance.
+    3. Unproject masked pixels to 3D.
+    4. Return bidirectional Chamfer Distance.
 
     Args:
         pred_depth: (B, H, W) predicted *planar* depth.

@@ -11,9 +11,9 @@ import torch
 
 def edge_mask(
     rgb: torch.Tensor,
-    canny_low: float = 0.2,
-    canny_high: float = 0.8,
-    dilation_px: int = 4,
+    canny_low: float,
+    canny_high: float,
+    dilation_px: int,
 ) -> torch.Tensor:
     """
     Compute a dilated edge mask from an RGB image using Canny.
