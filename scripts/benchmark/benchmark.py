@@ -2,13 +2,13 @@ import argparse
 import json
 import os
 
-import numpy as np
 import torch
 
 from ppdr.models import PPD, DAv2, DAv2Cleaned
 from ppdr.models.interface import DepthModel
 from ppdr.utils.benchmark import Benchmark
 from ppdr.utils.dataset import HypersimDataset
+from ppdr.utils.metrics import Metrics
 from ppdr.utils.reader import HypersimReader
 from ppdr.visualization import generate_plots
 
@@ -33,8 +33,8 @@ def load_all_inference_models(device: torch.device) -> dict[str, DepthModel]:
     dav2 = DAv2(device=device)
     dav2_cleaned = DAv2Cleaned(device=device)
     models: dict[str, DepthModel] = {
-        # "PPD": ppd,
-        # "DAv2": dav2,
+        "PPD": ppd,
+        "DAv2": dav2,
         "DAv2-Cleaned": dav2_cleaned,
     }
     return models
@@ -60,24 +60,23 @@ def main() -> None:
         warmup_batches=args.warmup_batches,
     )
 
-    print("Saving and plotting results...")
-    save_and_plot(results, args.output_dir)
-    print("Plots saved to", os.path.join(args.output_dir, "results.png"))
+    print_summary(results)
+    save_results(results, args.output_dir)
+    generate_plots(results, args.output_dir)
 
 
-def save_and_plot(results: dict[str, dict[str, list[float]]], output_dir: str) -> None:
+def print_summary(results: dict[str, Metrics]) -> None:
+    for name, model_results in results.items():
+        print(f"\n{name}")
+        model_results.print_summary()
+
+
+def save_results(results: dict[str, Metrics], output_dir: str) -> None:
     os.makedirs(output_dir, exist_ok=True)
     json_path = os.path.join(output_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2, default=str)
-
-    print("\nSummary")
-    for name, model_results in results.items():
-        avg_t = np.mean(model_results["inference_times"])
-        avg_cd = np.mean(model_results["chamfer_distances"])
-        print(f"{name:16s} Avg time: {avg_t:8.1f} ms | Avg Chamfer: {avg_cd:.6f}")
-
-    generate_plots(json_path, os.path.join(output_dir, "results.png"))
+    print("Results saved to", json_path)
 
 
 if __name__ == "__main__":

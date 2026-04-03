@@ -2,19 +2,89 @@
 Edge-Aware Chamfer Distance metric and Canny-based edge masking.
 """
 
+from dataclasses import dataclass, field
+
 import numpy as np
 import torch
 from scipy.spatial import KDTree
 
 from ppdr.utils.geometry import depth_to_point_cloud, edge_mask
 
-# ---------------------------------------------------------------------------
-# Configurable parameters
-# ---------------------------------------------------------------------------
-CANNY_LOW = 0.2
-CANNY_HIGH = 0.8
-DILATION_PIXELS = 5
-MAX_POINTS = 10_000
+
+@dataclass
+class Metrics:
+    """Holds per-image metric values for one batch."""
+
+    chamfer_distances: list[float] = field(default_factory=list)
+    inference_times: list[float] = field(default_factory=list)
+    precisions: list[float] = field(default_factory=list)
+    recalls: list[float] = field(default_factory=list)
+    fscores: list[float] = field(default_factory=list)
+
+    def extend(self, other: "Metrics") -> None:
+        self.chamfer_distances.extend(other.chamfer_distances)
+        self.inference_times.extend(other.inference_times)
+        self.precisions.extend(other.precisions)
+        self.recalls.extend(other.recalls)
+        self.fscores.extend(other.fscores)
+
+    def mean(self) -> dict[str, float]:
+        return {
+            "mean_chamfer_distance": float(np.mean(self.chamfer_distances)),
+            "mean_inference_time": float(np.mean(self.inference_times)),
+            "mean_precision": float(np.mean(self.precisions)),
+            "mean_recall": float(np.mean(self.recalls)),
+            "mean_fscore": float(np.mean(self.fscores)),
+        }
+
+    def print_summary(self) -> None:
+        for k, v in self.mean().items():
+            print(f"  {k}: {v:.4f}")
+
+
+def depth_fscore(
+    pred: torch.Tensor,  # (B, H, W), 0 = masked
+    gt: torch.Tensor,  # (B, H, W)
+    valid: torch.Tensor,  # (B, H, W) GT valid mask
+    delta: float = 1.25,
+) -> dict[str, list[float]]:
+    """
+    Computes F-score per image in the batch.
+    Returns lists of length B — one scalar per image.
+    """
+    B = pred.shape[0]
+    precisions, recalls, fscores = [], [], []
+
+    for b in range(B):
+        p = pred[b]  # (H, W)
+        g = gt[b]  # (H, W)
+        v = valid[b]  # (H, W)
+
+        pred_valid = v & (p > 0)  # unmasked AND GT-valid
+
+        if pred_valid.sum() == 0 or v.sum() == 0:
+            precisions.append(0.0)
+            recalls.append(0.0)
+            fscores.append(0.0)
+            continue
+
+        # Ratio only on valid pred pixels — no spurious zeros
+        ratio = torch.maximum(
+            p[pred_valid] / g[pred_valid],
+            g[pred_valid] / p[pred_valid],
+        )  # (N,)  N = #pred_valid pixels
+
+        accurate = ratio < delta  # (N,) bool
+
+        precision = accurate.float().mean()
+        recall = accurate.float().sum() / (v.float().sum() + 1e-8)
+        fscore = 2 * precision * recall / (precision + recall + 1e-8)
+
+        precisions.append(precision.item())
+        recalls.append(recall.item())
+        fscores.append(fscore.item())
+
+    return {"precisions": precisions, "recalls": recalls, "fscores": fscores}
 
 
 def edge_aware_chamfer(
@@ -23,9 +93,9 @@ def edge_aware_chamfer(
     rgb: torch.Tensor,
     m_cam_from_uv: torch.Tensor,
     valid_mask: torch.Tensor,
-    canny_low: float = CANNY_LOW,
-    canny_high: float = CANNY_HIGH,
-    dilation_px: int = DILATION_PIXELS,
+    canny_low: float = 0.2,
+    canny_high: float = 0.8,
+    dilation_px: int = 5,
 ) -> list[float]:
     """
     Compute the Edge-Aware Chamfer Distance (GPU-accelerated).
@@ -33,7 +103,6 @@ def edge_aware_chamfer(
     1. Find edges in ``rgb`` via Canny, dilate.
     2. Combine edge mask with ``valid_mask`` and depth > 0 for both pred/GT.
     3. Unproject masked pixels to 3D on ``device``.
-    4. Subsample to ``MAX_POINTS`` for tractable GPU distance computation.
     5. Return bidirectional Chamfer Distance.
 
     Args:
