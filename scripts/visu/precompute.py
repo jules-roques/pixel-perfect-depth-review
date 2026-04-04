@@ -48,7 +48,7 @@ def main():
         torch.save(disp.cpu(), f"{out}/disp_dav2.pt")
 
         disp_cleaned, _ = dav2_cleaned.predict(image)
-        torch.save(disp_cleaned.cpu(), f"{out}/disp_dav2_cleaned.pt")
+        torch.save(disp_cleaned.cpu(), f"{out}/disp_dav2_clean.pt")
 
         depth, _ = ppd.predict(image)
         torch.save(depth.cpu(), f"{out}/depth_ppd.pt")
