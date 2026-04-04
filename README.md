@@ -1,6 +1,12 @@
-# Pixel-Perfect Depth Review (ppdr)
+# Pixel-Perfect Depth Review
 
-This project provides wrappers and tools for evaluating depth estimation models, specifically focusing on Pixel-Perfect Depth (PPD).
+This project aims to evaluate and compare the performance of different monocular depth estimation models, specifically focusing on Pixel-Perfect Depth (PPD), Depth Anything v2 (DAv2), and DAv2 with a flying-pixel cleaning heuristic.
+
+| Ground Truth | PPD |
+| :---: | :---: |
+| ![GT](results/visuals/ai_048_010_cam_03_47/gt_cloud.png) | ![PPD](results/visuals/ai_048_010_cam_03_47/ppd_cloud.png) |
+| **DAv2** | **DAv2 Cleaned** |
+| ![DAv2](results/visuals/ai_048_010_cam_03_47/dav2_cloud.png) | ![DAv2-Clean](results/visuals/ai_048_010_cam_03_47/dav2_clean_cloud.png) |
 
 ## Installation with uv
 
@@ -18,6 +24,20 @@ uv sync
 ```bash
 uv run scripts/download/download_test_data.py
 uv run scripts/download/download_models.py
+```
+
+## Launching experiments
+
+```bash
+uv run scripts/bench/benchmark.py # Needs GPU
+uv run scripts/bench/generate_markdown_report.py
+```
+
+## Generating Visuals
+
+```bash
+uv run scripts/visu/precompute.py # Needs GPU
+uv run scripts/visu/visualize.py
 ```
 
 ## Third-party Code Attribution

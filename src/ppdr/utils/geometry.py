@@ -62,9 +62,9 @@ def depth_canny_edge_mask(
     if dilation_px > 0:
         kernel_size = dilation_px * 2 + 1
         kernel = torch.ones((kernel_size, kernel_size), device=depth.device)
-        edges = (
-            K.morphology.dilation(edges.float().unsqueeze(1), kernel) > 0
-        ).squeeze(1)
+        edges = (K.morphology.dilation(edges.float().unsqueeze(1), kernel) > 0).squeeze(
+            1
+        )
 
     return edges
 
@@ -110,8 +110,8 @@ def create_ndc_grid(
     v = torch.arange(height, device=device, dtype=torch.float32)
     uu, vv = torch.meshgrid(u, v, indexing="xy")
 
-    u_ndc = (2.0 * uu) / width - 1.0
-    v_ndc = (2.0 * vv) / height - 1.0
+    u_ndc = (2.0 * (uu + 0.5)) / width - 1.0
+    v_ndc = 1.0 - (2.0 * (vv + 0.5)) / height
 
     return torch.stack([u_ndc, v_ndc, torch.ones_like(u_ndc)], dim=-1)
 
