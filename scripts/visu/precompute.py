@@ -45,13 +45,13 @@ def main():
         image = entry["image"].unsqueeze(0).to(device)
 
         disp, _ = dav2.predict(image)
-        torch.save(disp, f"{out}/disp_dav2.pt")
+        torch.save(disp.cpu(), f"{out}/disp_dav2.pt")
 
         disp_cleaned, _ = dav2_cleaned.predict(image)
-        torch.save(disp_cleaned, f"{out}/disp_dav2_cleaned.pt")
+        torch.save(disp_cleaned.cpu(), f"{out}/disp_dav2_cleaned.pt")
 
         depth, _ = ppd.predict(image)
-        torch.save(depth, f"{out}/depth_ppd.pt")
+        torch.save(depth.cpu(), f"{out}/depth_ppd.pt")
 
 
 if __name__ == "__main__":
