@@ -9,12 +9,11 @@ from ppdr.models.interface import DepthModel
 from ppdr.utils.benchmark import Benchmark
 from ppdr.utils.dataset import HypersimDataset
 from ppdr.utils.metrics import Metrics
-from ppdr.utils.reader import HypersimReader
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_root", type=str, default="data/hypersim_test_set")
+    parser.add_argument("--data_root", type=str, default="data/hypersim")
     parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--warmup_batches", type=int, default=1)
@@ -45,7 +44,7 @@ def main() -> None:
     models = load_all_inference_models(device)
 
     print("Running benchmark on dataset...")
-    dataset = HypersimDataset(HypersimReader(args.data_root))
+    dataset = HypersimDataset(args.data_root)
     benchmark = Benchmark(dataset=dataset)
     results = benchmark.run(
         models=models,

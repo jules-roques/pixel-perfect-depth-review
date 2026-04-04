@@ -33,7 +33,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default="data/hypersim_test_set",
+        default="data/hypersim",
         help="Root directory for downloaded data",
     )
     parser.add_argument(

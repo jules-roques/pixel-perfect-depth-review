@@ -7,8 +7,8 @@ from ppdr.utils.transform import image_array2tensor, linear_to_rgb
 
 
 class HypersimDataset(Dataset):
-    def __init__(self, hypersim_reader: HypersimReader):
-        self.reader = hypersim_reader
+    def __init__(self, data_dir: str = "data/hypersim"):
+        self.reader = HypersimReader(data_dir)
 
     def __len__(self) -> int:
         return self.reader.get_number_entries()

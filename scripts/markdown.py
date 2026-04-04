@@ -1,3 +1,7 @@
+"""
+This script generates a markdown report from the results of the evaluation.
+"""
+
 import argparse
 import json
 import os

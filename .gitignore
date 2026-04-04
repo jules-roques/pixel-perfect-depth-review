@@ -4,7 +4,7 @@ venv
 __pycache__/*
 *.pth
 *.pt
-hypersim_test_set
+hypersim
 checkpoints
 .env
 *.egg-info/
