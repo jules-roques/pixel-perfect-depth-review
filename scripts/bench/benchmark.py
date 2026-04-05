@@ -53,22 +53,14 @@ def main() -> None:
         warmup_batches=args.warmup_batches,
     )
 
-    print_summary(results)
     save_results(results, args.output_dir)
-
-
-def print_summary(results: dict[str, Metrics]) -> None:
-    for name, model_results in results.items():
-        print(f"\n{name}")
-        model_results.print_summary()
 
 
 def save_results(results: dict[str, Metrics], output_dir: str) -> None:
     os.makedirs(output_dir, exist_ok=True)
     json_path = os.path.join(output_dir, "results.json")
-    data = {name: res.to_dict() for name, res in results.items()}
     with open(json_path, "w") as f:
-        json.dump(data, f, indent=2, default=str)
+        json.dump(results, f, indent=2, default=str)
     print(f"Results saved to {json_path}")
 
 

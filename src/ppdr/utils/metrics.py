@@ -28,19 +28,6 @@ class Metrics:
         self.recalls.extend(other.recalls)
         self.fscores.extend(other.fscores)
 
-    def mean(self) -> dict[str, float]:
-        return {
-            "mean_chamfer_distance": float(np.mean(self.chamfer_distances)),
-            "mean_inference_time": float(np.mean(self.inference_times)),
-            "mean_precision": float(np.mean(self.precisions)),
-            "mean_recall": float(np.mean(self.recalls)),
-            "mean_fscore": float(np.mean(self.fscores)),
-        }
-
-    def print_summary(self) -> None:
-        for k, v in self.mean().items():
-            print(f"  {k}: {v:.4f}")
-
     def to_dict(self) -> dict[str, list[float]]:
         return {
             "chamfer_distances": self.chamfer_distances,
@@ -79,7 +66,7 @@ def depth_fscore(
             g[pred_valid] / p[pred_valid],
         )
         accurate = ratio < delta
-        precision = accurate.float().mean()
+        precision = accurate.float().sum() / (pred_mask[b].float().sum() + 1e-8)
         recall = accurate.float().sum() / (v.float().sum() + 1e-8)
         fscore = 2 * precision * recall / (precision + recall + 1e-8)
 

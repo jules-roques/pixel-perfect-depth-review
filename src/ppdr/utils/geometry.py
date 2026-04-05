@@ -202,7 +202,9 @@ def recover_metric_depth_from_disparity(
         aligned_disp = a * d_i + b
         aligned_disp = torch.clamp(aligned_disp, min=1e-6)  # prevent /0 and neg depth
         p_metric_i = 1.0 / aligned_disp
-        pred_metric[i] = p_metric_i
+        
+        max_gt_depth = g_i[m_i].max()
+        pred_metric[i] = torch.clamp(p_metric_i, max=max_gt_depth * 2.0)
         
     return torch.clamp(pred_metric, min=1e-3)
 

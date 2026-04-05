@@ -23,7 +23,7 @@ class Benchmark:
     DEPTH_CANNY_HIGH = 0.5
 
     # Ratio threshold for fscore computation
-    DELTA = 1.25
+    DELTA = 1.05
 
     def __init__(self, dataset: HypersimDataset) -> None:
         self.dataset = dataset
@@ -38,7 +38,7 @@ class Benchmark:
         batch_size: int,
         max_batches: int | None = None,
         warmup_batches: int = 1,
-    ) -> dict[str, Metrics]:
+    ) -> dict:
         """Evaluate *models* and return per-model results.
 
         Args:
@@ -48,7 +48,7 @@ class Benchmark:
             warmup_images: number of warm-up forward passes per model.
 
         Returns:
-            A dict mapping model names to their measured metrics.
+            A dict mapping model names to their measured metrics and the delta value.
         """
         loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
 
@@ -59,6 +59,9 @@ class Benchmark:
             results[model_name] = Benchmark._evaluate_one_model(
                 model, loader, max_batches
             )
+
+        results = {name: res.to_dict() for name, res in results.items()}
+        results["delta"] = Benchmark.DELTA
 
         return results
 
@@ -98,12 +101,12 @@ class Benchmark:
         ndc_to_cams = batch["ndc_to_cam"].to(model.device)
         B = images.shape[0]
 
-        pred_depths, pred_masks, time_elapsed = Benchmark._time_prediction(
+        pred_depths, pred_valid_masks, time_elapsed = Benchmark._time_prediction(
             model, images
         )
 
         metric_depth = model.align_pred_on_metric_depth(
-            pred_depths, true_depths, gt_valid_masks
+            pred_depths, true_depths, gt_valid_masks & pred_valid_masks
         )
 
         chamfer_distances = edge_aware_chamfer(
@@ -112,7 +115,7 @@ class Benchmark:
             rgb=images,
             m_cam_from_uv=ndc_to_cams,
             valid_mask=gt_valid_masks,
-            pred_mask=pred_masks,
+            pred_mask=pred_valid_masks,
             canny_low=Benchmark.CANNY_LOW,
             canny_high=Benchmark.CANNY_HIGH,
             dilation_px=Benchmark.DILATION_PX,
@@ -124,7 +127,7 @@ class Benchmark:
             metric_depth,
             true_depths,
             gt_valid_masks,
-            pred_masks,
+            pred_valid_masks,
             delta=Benchmark.DELTA,
         )
 
