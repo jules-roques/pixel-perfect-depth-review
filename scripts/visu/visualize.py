@@ -109,23 +109,23 @@ def main():
     save_cloud(
         ppd_pts.numpy(),
         image_tensor2array(image)[valid_mask_ppd.squeeze(0).cpu().numpy()],
-        f"{out_dir}/ppd_cloud.pdf",
+        f"{out_dir}/ppd_cloud.svg",
     )
     save_cloud(
         dav2_pts.numpy(),
         image_tensor2array(image)[valid_mask_dav2.squeeze(0).cpu().numpy()],
-        f"{out_dir}/dav2_cloud.pdf",
+        f"{out_dir}/dav2_cloud.svg",
     )
     save_cloud(
         dav2_clean_pts.numpy(),
         image_tensor2array(image)[valid_mask_dav2_clean.squeeze(0).cpu().numpy()],
-        f"{out_dir}/dav2_clean_cloud.pdf",
+        f"{out_dir}/dav2_clean_cloud.svg",
     )
 
     save_cloud(
         gt_pts.numpy(),
         image_tensor2array(image)[gt_valid_mask.squeeze(0).cpu().numpy()],
-        f"{out_dir}/gt_cloud.pdf",
+        f"{out_dir}/gt_cloud.svg",
     )
 
 
