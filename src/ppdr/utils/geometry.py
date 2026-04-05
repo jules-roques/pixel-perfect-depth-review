@@ -132,18 +132,36 @@ def recover_metric_depth_from_log(
     Affine alignment in log-depth space (for PPD).
     Solves: a * pred + b = log(gt + eps)  via least squares.
     """
-    valid_pred = pred[mask].view(-1)
-    valid_gt_log = torch.log(gt[mask].view(-1) + eps)
+    B = pred.shape[0]
+    pred_metric = torch.zeros_like(pred)
+    
+    for i in range(B):
+        p_i = pred[i]
+        g_i = gt[i]
+        m_i = mask[i]
+        
+        valid_pred = p_i[m_i].view(-1)
+        valid_gt_log = torch.log(g_i[m_i].view(-1) + eps)
+        
+        if valid_pred.numel() == 0:
+            pred_metric[i] = p_i
+            continue
 
-    # Build system: [pred, 1] @ [a, b]^T = gt_log
-    A = torch.stack([valid_pred, torch.ones_like(valid_pred)], dim=1)  # (N, 2)
-    # Normal equations: (A^T A) [a,b] = A^T gt_log
-    ATA = A.T @ A  # (2, 2)
-    ATb = A.T @ valid_gt_log  # (2,)
-    a, b = torch.linalg.solve(ATA, ATb)
+        # Build system: [pred, 1] @ [a, b]^T = gt_log
+        A = torch.stack([valid_pred, torch.ones_like(valid_pred)], dim=1)  # (N, 2)
+        # Normal equations: (A^T A) [a,b] = A^T gt_log
+        ATA = A.T @ A  # (2, 2)
+        ATb = A.T @ valid_gt_log  # (2,)
+        
+        try:
+            a, b = torch.linalg.solve(ATA, ATb)
+        except RuntimeError:
+            a, b = torch.tensor([1.0], device=pred.device), torch.tensor([0.0], device=pred.device)
 
-    pred_metric = torch.exp(a * pred + b) - eps
-    return torch.clamp(pred_metric, min=1e-3, max=gt[mask].max().item())
+        p_metric_i = torch.exp(a * p_i + b) - eps
+        pred_metric[i] = p_metric_i
+
+    return torch.clamp(pred_metric, min=1e-3)
 
 
 def recover_metric_depth_from_disparity(
@@ -157,18 +175,36 @@ def recover_metric_depth_from_disparity(
 
     Note: gt must have strictly positive values in the valid mask.
     """
-    valid_disp = disp[mask].view(-1)
-    valid_gt_disp = 1.0 / gt[mask].view(-1)  # depth → disparity
+    B = disp.shape[0]
+    pred_metric = torch.zeros_like(disp)
+    
+    for i in range(B):
+        d_i = disp[i]
+        g_i = gt[i]
+        m_i = mask[i]
+        
+        valid_disp = d_i[m_i].view(-1)
+        valid_gt_disp = 1.0 / g_i[m_i].view(-1)  # depth → disparity
+        
+        if valid_disp.numel() == 0:
+            pred_metric[i] = d_i
+            continue
 
-    A = torch.stack([valid_disp, torch.ones_like(valid_disp)], dim=1)  # (N, 2)
-    ATA = A.T @ A
-    ATb = A.T @ valid_gt_disp
-    a, b = torch.linalg.solve(ATA, ATb)
+        A = torch.stack([valid_disp, torch.ones_like(valid_disp)], dim=1)  # (N, 2)
+        ATA = A.T @ A
+        ATb = A.T @ valid_gt_disp
+        
+        try:
+            a, b = torch.linalg.solve(ATA, ATb)
+        except RuntimeError:
+            a, b = torch.tensor([1.0], device=disp.device), torch.tensor([0.0], device=disp.device)
 
-    aligned_disp = a * disp + b
-    aligned_disp = torch.clamp(aligned_disp, min=1e-6)  # prevent /0 and neg depth
-    pred_metric = 1.0 / aligned_disp
-    return torch.clamp(pred_metric, min=1e-3, max=gt[mask].max().item())
+        aligned_disp = a * d_i + b
+        aligned_disp = torch.clamp(aligned_disp, min=1e-6)  # prevent /0 and neg depth
+        p_metric_i = 1.0 / aligned_disp
+        pred_metric[i] = p_metric_i
+        
+    return torch.clamp(pred_metric, min=1e-3)
 
 
 def create_valid_depth_mask(depth: torch.Tensor) -> torch.Tensor:
