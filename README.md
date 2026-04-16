@@ -1,5 +1,3 @@
-⚠️ The last versions of the report was updated on the 6th of April 2026. ⚠️
-
 # Pixel-Perfect Depth Review
 
 This project aims to evaluate and compare the performance of different monocular depth estimation models, specifically focusing on Pixel-Perfect Depth (PPD), Depth Anything v2 (DAv2), and DAv2 with a flying-pixel cleaning heuristic. The evaluation is conducted on the HyperSim dataset, which provides high-quality ground truth depth maps for benchmarking.
